@@ -12,7 +12,7 @@ import {
 } from './sim/bunker.js';
 import { upgradeDoor } from './sim/raid.js';
 import {
-  initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas,
+  initUI, renderUI, renderPanel, openPanel, showTitle, drawTitleArt, showGame, setView, closePanel, showToast, setDebug, getCanvas,
   armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay, applyIconSprites,
   renderGuide, pulsePanelButtons, renderMissions,
 } from './render/ui.js';
@@ -483,7 +483,7 @@ function boot() {
 
   // 모바일: 길게 누를 때 뜨는 메뉴 막기
   app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => { resizeCanvas(); drawTitleArt(); });
   // 패널 펼침 등으로 무대 크기가 바뀌면 캔버스도 다시 맞춘다
   if (typeof ResizeObserver !== 'undefined') {
     new ResizeObserver(() => resizeCanvas()).observe(app.canvas.parentElement);
@@ -497,6 +497,7 @@ function boot() {
     if (app.surfaceView) app.surfaceView.invalidate();
     if (app.bunkerView) app.bunkerView.invalidate();
     applyIconSprites();
+    drawTitleArt();
   });
 
   const { exists } = readSave();

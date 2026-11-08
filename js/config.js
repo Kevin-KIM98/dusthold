@@ -115,6 +115,28 @@ export const CONFIG = Object.freeze({
     STRIP_W: 80,                   // 지표면 풀 띠 이미지 한 장 폭
     PERSON_H: 26,                  // 사람 이미지 높이 (줌 1)
     WORK_FRAME_MS: 350,            // 일하는 사람 2프레임 바꾸는 간격
+    LABEL_PX: 11,                  // 방 이름표 글자 크기 (월드 px)
+    LABEL_MIN_PX: 8,
+    LABEL_PAD: 3,                  // 이름표 띠 안쪽 여백
+    LABEL_TOP: 9,                  // 방 위쪽 끝에서 이름표까지 (천장 전선 아래)
+    DIG_HINT_INSET: 6,             // 팔 수 있는 칸 점선 테두리 안쪽 여백
+    DIG_HINT_ICON: 18,             // 팔 수 있는 칸 가운데 곡괭이 크기
+  }),
+  // ---------- 타이틀 화면 배경 장면 (이미 있는 그림으로 꾸민 벙커 단면) ----------
+  TITLE_SCENE: Object.freeze({
+    WORLD_W: 460,                  // 장면 폭 (벙커 화면과 같은 월드 단위, 화면 폭에 맞춰 늘림)
+    HORIZON: 0.46,                 // 지표면 높이 (화면 높이 비율)
+    SUN: Object.freeze({ x: 0.72, r: 0.16 }),   // 지는 해: 화면 폭 비율 위치·반지름
+    ROOMS: Object.freeze([         // [층, 열, 방, 일하는 사람 특기]
+      Object.freeze([1, 0, 'storage', null]), Object.freeze([1, 1, 'generator', 'tech']), Object.freeze([1, 3, 'shaft', null]),
+      Object.freeze([1, 4, 'water', 'gather']), Object.freeze([1, 6, 'guard', 'combat']),
+      Object.freeze([2, 1, 'farm', 'gather']), Object.freeze([2, 3, 'shaft', null]), Object.freeze([2, 4, 'workshop', 'build']),
+      Object.freeze([3, 1, 'quarters', null]), Object.freeze([3, 3, 'shaft', null]), Object.freeze([3, 4, 'medbay', 'tech']),
+    ]),
+    ZOMBIES: Object.freeze([       // [x(월드), 종류] — 왼쪽에서 문으로 다가온다
+      Object.freeze([24, 'brute']), Object.freeze([70, 'normal']), Object.freeze([108, 'runner']), Object.freeze([150, 'normal']),
+    ]),
+    MAX_DPR: 2,
   }),
   FX: Object.freeze({
     MAX_PARTICLES: 150,            // 성능 상한

@@ -215,7 +215,7 @@ export function createSurfaceView() {
   return view;
 }
 
-const ZOMBIE_H = { normal: 26, runner: 24, brute: 38 }; // 줌 1에서 화면 높이(px)
+export const ZOMBIE_H = { normal: 26, runner: 24, brute: 38 }; // 줌 1에서 화면 높이(px)
 
 /** 좀비 이미지 + 걷는 흔들림 + 체력 막대. 이미지가 없으면 false */
 export function drawZombieSprite(ctx, x, y, k, z, face, now) {

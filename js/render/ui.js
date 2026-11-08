@@ -1,6 +1,7 @@
 // 상단 바·시계·배속·탭·패널·토스트·기록. DOM은 여기와 main.js, input.js만 만진다.
 
 import { CONFIG } from '../config.js';
+import { drawTitleScene } from './titleScene.js';
 import { t } from '../strings.js';
 import { topBarModel, clockModel, logModel, panelKey } from './viewModel.js';
 import { spriteCss } from './sprites.js';
@@ -276,10 +277,17 @@ export function pulsePanelButtons(selectors) {
 
 export function showTitle(hasSave) {
   el.title.hidden = false;
+  drawTitleArt();
   el.game.hidden = true;
   el.btnContinue.hidden = !hasSave;
   el.btnNew.textContent = t('title.new');
   el.btnNew.dataset.confirm = '';
+}
+
+/** 타이틀 배경 장면 (보일 때만). 크기가 바뀌거나 그림을 불러오면 다시 */
+export function drawTitleArt() {
+  if (el.title.hidden) return;
+  drawTitleScene(document.getElementById('title-art'));
 }
 
 /** 새 게임 버튼: 저장이 있으면 한 번 더 눌러야 시작 */

@@ -5,7 +5,7 @@
 import { CONFIG } from '../config.js';
 import { t } from '../strings.js';
 import { isNight } from '../sim/clock.js';
-import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets } from '../sim/bunker.js';
+import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets, canDig, digAt } from '../sim/bunker.js';
 import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
 import { drawZombie } from './zombieArt.js';
@@ -16,10 +16,10 @@ const V = CONFIG.BUNKER_VIEW;
 const BK = CONFIG.BUNKER;
 const C = CONFIG.CAMERA;
 
-const PAL = {
+export const PAL = {
   bg: '#0d1013', sky: '#7d9bb3', skyNight: '#121a2b', grass: '#4d7a3a', soil: '#5a4330', soilDeep: '#3f2e21', soilDot: 'rgba(0,0,0,0.18)',
   cave: '#2b2622', wall: '#1a1714', selected: '#ffd54f', cableOn: '#ffd54f', cableOff: '#5a5a5a',
-  off: 'rgba(0,0,0,0.6)', bolt: '#ffd54f', boltOff: '#d0504a', label: 'rgba(255,255,255,0.85)', labelDark: 'rgba(255,255,255,0.45)',
+  off: 'rgba(0,0,0,0.6)', bolt: '#ffd54f', boltOff: '#d0504a', label: 'rgba(255,255,255,0.95)', labelDark: 'rgba(255,255,255,0.6)', labelBg: 'rgba(12,10,8,0.62)', digHint: 'rgba(255,226,150,0.45)', below: '#20160f',
   scaffold: '#c9a25a', frame: '#9aa0a6', bar: '#ffd54f', barBg: 'rgba(0,0,0,0.6)',
   door: '#6d7277', doorDark: '#3d4145', crane: '#e0a030',
   spec: { gather: '#6abf4b', build: '#e8913a', combat: '#e0504a', tech: '#4aa3df' },
@@ -55,9 +55,11 @@ export function createBunkerView() {
   view.toScreen = (wx, wy, w, h) => ({ x: (wx - view.camera.cx) * z() + w / 2, y: (wy - view.camera.cy) * z() + h / 2 });
   view.toWorld = (sx, sy, w, h) => ({ x: (sx - w / 2) / z() + view.camera.cx, y: (sy - h / 2) / z() + view.camera.cy });
 
-  /** 처음 열 때: 폭에 맞추고 지표면이 보이게 */
+  /** 처음 열 때: 화면을 꽉 채우되(아래 빈 띠 없이) 7칸은 모두 보이게, 지표면이 위에 */
   view.fit = (w, h) => {
-    view.camera.zoom = Math.max(C.ZOOM_MIN, Math.min(C.ZOOM_MAX, w / ws.w));
+    const cover = Math.max(w / ws.w, h / ws.h);
+    const allCols = w / (BK.COLS * V.CELL_W);
+    view.camera.zoom = Math.max(C.ZOOM_MIN, Math.min(C.ZOOM_MAX, cover, allCols));
     view.camera.cx = ws.w / 2;
     view.camera.cy = h / 2 / view.camera.zoom;
     view.camera.fitted = true;
@@ -197,13 +199,34 @@ export function createBunkerView() {
         g.fillRect(r.x + 2, r.y + 3, r.w - 4, r.h - 6);
       }
     }
+    // 다음에 팔 수 있는 칸: 은은한 점선 + 곡괭이 (자원이 모자라도 위치는 보여준다)
+    g.setLineDash([5, 4]);
+    g.strokeStyle = PAL.digHint;
+    g.lineWidth = 1.5;
+    for (let f = 1; f <= BK.MAX_FLOORS; f++) {
+      for (let c = 0; c < BK.COLS; c++) {
+        if (isDug(state, f, c) || digAt(state, f, c)) continue;
+        const ok = canDig(state, f, c);
+        if (!ok.ok && ok.reason !== 'reason.need') continue;
+        const r = cellRect(f, c), m = V.DIG_HINT_INSET, ic = V.DIG_HINT_ICON;
+        g.strokeRect(r.x + m, r.y + m, r.w - 2 * m, r.h - 2 * m);
+        g.globalAlpha = 0.5;
+        if (!drawSprite(g, 'pickaxe', r.x + (r.w - ic * 0.86) / 2, r.y + (r.h - ic) / 2, ic * 0.86, ic)) {
+          g.fillStyle = PAL.digHint;
+          g.fillRect(r.x + r.w / 2 - 1, r.y + r.h / 2 - 6, 2, 12);
+          g.fillRect(r.x + r.w / 2 - 6, r.y + r.h / 2 - 1, 12, 2);
+        }
+        g.globalAlpha = 1;
+      }
+    }
+    g.setLineDash([]);
     // 완공된 방
     for (const room of state.bunker.rooms) if (room.done && !roomDef(room.type).attach) drawRoomStatic(g, room);
     view.cacheKey = cacheKeyOf(state);
     view.cacheState = state;
   }
 
-  const cacheKeyOf = (state) => state.bunker.rev + (isNight(state) ? 'n' : 'd') + '|' + roomsSignature(state);
+  const cacheKeyOf = (state) => state.bunker.rev + (isNight(state) ? 'n' : 'd') + '|' + roomsSignature(state) + '|' + state.bunker.digs.map((d) => d.id).join('.');
 
   view.invalidate = () => { view.cacheKey = null; };
 
@@ -226,7 +249,9 @@ export function createBunkerView() {
     const ww = ws.w * zz, wh = ws.h * zz;
     ctx.fillStyle = PAL.bg;
     if (o.y > 0) ctx.fillRect(0, 0, w, o.y);
+    ctx.fillStyle = PAL.below; // 월드 아래 = 더 깊은 흙 색 (검은 띠 대신)
     if (o.y + wh < h) ctx.fillRect(0, o.y + wh, w, h - o.y - wh);
+    ctx.fillStyle = PAL.bg;
     if (o.x > 0) ctx.fillRect(0, 0, o.x, h);
     if (o.x + ww < w) ctx.fillRect(o.x + ww, 0, w - o.x - ww, h);
     if (Math.abs(view.cacheScale - z() * dpr) < 0.01) {
@@ -653,12 +678,21 @@ function drawCracks(ctx, x, y, w, h, zz) {
 }
 
 // ---------- 조각 그림 ----------
+/** 방 이름표: 어두운 반투명 띠 위에 글자 (방 그림이 밝거나 어두워도 읽히게) */
 function drawLabel(ctx, x, y, zz, text, dim) {
+  const fs = Math.max(V.LABEL_MIN_PX, Math.round(V.LABEL_PX * zz));
+  const pad = V.LABEL_PAD * zz;
+  ctx.font = `bold ${fs}px sans-serif`;
+  const bw = ctx.measureText(text).width + pad * 2, bh = fs + pad * 1.4;
+  const bx = x + 3 * zz, by = y + V.LABEL_TOP * zz;
+  ctx.fillStyle = PAL.labelBg;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 3 * zz); else ctx.rect(bx, by, bw, bh);
+  ctx.fill();
   ctx.fillStyle = dim ? PAL.labelDark : PAL.label;
-  ctx.font = `${Math.max(8, Math.round(10 * zz))}px sans-serif`;
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, x + 5 * zz, y + 10 * zz);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, bx + pad, by + bh / 2 + 0.5 * zz);
 }
 
 function drawBar(ctx, x, y, w, h, zz, p) {
@@ -712,7 +746,7 @@ function drawBolt(ctx, cx, cy, s, color, slash) {
 
 /** 발 위치 (fx, fy) 기준 사람. bob = 위아래 흔들림 */
 /** opts: { working: 일하는 중이면 2프레임 번갈아, now, flip: 왼쪽 보기 } */
-function drawPerson(ctx, fx, fy, zz, s, bob, opts) {
+export function drawPerson(ctx, fx, fy, zz, s, bob, opts) {
   const k = zz;
   const by = fy - (bob || 0) * 1.5 * k;
   const o = opts || {};
