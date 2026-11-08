@@ -5,7 +5,7 @@ import { pushLog, pushEvent } from './log.js';
 import { DAY_TICKS, DAYLIGHT_TICKS, RAID_WARNING_TICKS, getDay } from './clock.js';
 import { step as surfaceStep, onNightStart as surfaceNight } from './surface.js';
 import { step as bunkerStep } from './bunker.js';
-import { step as raidStep, onNightStart as raidNight, onDawn as raidDawn } from './raid.js';
+import { step as raidStep, onNightStart as raidNight, onDawn as raidDawn, planNight } from './raid.js';
 import { step as economyStep, onDawn as economyDawn, onNightStart as economyNight } from './economy.js';
 import { updateTutorial } from './tutorial.js';
 
@@ -23,6 +23,7 @@ export function tick(state) {
   if (inDay === 0) {
     raidDawn(state);
     economyDawn(state);
+    planNight(state, day); // 오늘 밤 좀비 명단을 새벽에 정한다 (미션에 보여주려고)
     pushLog(state, 'log.newDay', { day });
     pushEvent(state, 'toast.newDay', { day });
   } else if (inDay === DAYLIGHT_TICKS) {

@@ -276,6 +276,7 @@ export function playGame(seed, maxDays = 20, hooks = {}) {
     if (hooks.onDay && s.time.tick % DAY_TICKS === (hooks.atTick ?? DAYLIGHT_TICKS - 1)) hooks.onDay(s);
     const was = s.raid.breached;
     tick(s);
+    if (hooks.onTick) hooks.onTick(s);
     if (!was && s.raid.breached) { breaches++; if (!firstBreachDay) firstBreachDay = getDay(s); }
     s.events.length = 0;
   }

@@ -14,7 +14,8 @@ import {
   projectRemainingSec, roomDef, inBounds, turrets, canBuildTurret, canRepair, repairCost,
 } from '../sim/bunker.js';
 import { doorMax, canUpgradeDoor, defenseDps } from '../sim/raid.js';
-import { currentStep, TUTORIAL_STEPS, guardCellFree } from '../sim/tutorial.js';
+import { currentStep, TUTORIAL_STEPS, guardCellFree, isTutorialActive } from '../sim/tutorial.js';
+import { dayMissions } from '../sim/missions.js';
 import { tileIndex } from '../sim/surface.js';
 import { workerMap } from '../sim/economy.js';
 
@@ -441,6 +442,45 @@ export function tutorialModel(state) {
   }
   if (!anyone && step !== 'guard' && !extra.length) extra.push(t('guide.noIdle'));
   return { step, title: t('guide.title', { n, total }), body: t(key), extra: extra.join(' '), target };
+}
+
+// ---------- 일차별 미션 ----------
+function goalText(m) {
+  const g = m.goal;
+  const p = { cur: m.cur, need: m.need };
+  if (g.kind === 'build') return t('goal.build', { ...p, room: t('room.' + g.room) });
+  return t('goal.' + g.kind, p);
+}
+
+function mustText(m) {
+  if (m.id === 'defense') {
+    if (m.repelled) return t('mission.repelled');
+    if (m.need === Infinity) return t('mission.defenseImpossible', m.params);
+    return t('mission.defense', { n: m.params.n, cur: m.cur, need: m.need });
+  }
+  return t('mission.' + m.id, { cur: m.cur, need: m.need });
+}
+
+/** 미션 카드. 가이드 중이면 null (가이드가 먼저) */
+export function missionModel(state) {
+  if (isTutorialActive(state) || state.outcome) return null;
+  const list = dayMissions(state);
+  const must = list.filter((m) => m.survival);
+  const goals = list.filter((m) => !m.survival);
+  const mustDone = must.filter((m) => m.done).length;
+  const goalDone = goals.filter((m) => m.done).length;
+  const defense = must.find((m) => m.id === 'defense');
+  const day = getDay(state);
+  const bigTomorrow = (day + 1) % CONFIG.RAID.BIG_EVERY_DAYS === 0 && day + 1 > CONFIG.TUTORIAL.PRACTICE_DAYS;
+  return {
+    note: bigTomorrow ? t('mission.bigTomorrow') : '',
+    title: t('mission.title', { day: getDay(state) }),
+    summary: t('mission.summary', { a: mustDone, b: must.length, c: goalDone, d: goals.length }),
+    must: must.map((m) => ({ text: mustText(m), done: m.done })),
+    how: defense && !defense.done && !defense.repelled ? t('mission.defenseHow') : '',
+    goals: goals.map((m) => ({ text: goalText(m), done: m.done })),
+    allMust: mustDone === must.length,
+  };
 }
 
 /** 지금 단계에서 반짝일 패널 버튼 */

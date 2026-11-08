@@ -8,7 +8,8 @@ import { makeSurvivor } from './survivors.js';
 import { generateMap } from './surface.js';
 import { createBunker, createDoor } from './bunker.js';
 import { recomputeGrid } from './economy.js';
-import { createRaid } from './raid.js';
+import { createRaid, planNight } from './raid.js';
+import { getDay } from './clock.js';
 import { createTutorial, TUTORIAL_STEPS } from './tutorial.js';
 
 export { pushLog, pushEvent };
@@ -50,6 +51,7 @@ export function createState(seed) {
   }
   state.rng = rng.getState();
   recomputeGrid(state);
+  planNight(state, 1); // 오늘 밤 좀비 명단 (미션 계산용)
   pushLog(state, 'log.start', { n: state.survivors.length });
   return state;
 }
@@ -126,6 +128,11 @@ export function migrate(raw) {
   if (s.version === 5) {
     // v5 → v6: 1일차 가이드. 이미 하던 게임은 가이드를 끝난 것으로
     s = { ...s, version: 6, tutorial: { step: TUTORIAL_STEPS.length, done: true, skipped: false } };
+  }
+  if (s.version === 6) {
+    // v6 → v7: 일차별 미션용 오늘 밤 계획
+    s = { ...s, version: 7 };
+    planNight(s, getDay(s));
   }
   if (s.version !== CONFIG.SAVE.VERSION) return null;
   return s;

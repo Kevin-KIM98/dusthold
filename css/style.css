@@ -156,3 +156,22 @@ body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
 @keyframes guide-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,213,79,0.0); } 50% { box-shadow: 0 0 0 4px rgba(255,213,79,0.85); } }
 .btn.pulse, .tab.pulse { animation: guide-pulse 0.9s ease-in-out infinite; position: relative; z-index: 1; }
 .tab.pulse { background: rgba(217,164,65,0.25); }
+
+/* 일차별 미션 카드 (가이드와 같은 자리) */
+#missions { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 25; background: rgba(20,24,28,0.94); border: 2px solid var(--accent); border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.5); overflow: hidden; }
+#missions.danger { border-color: var(--low); }
+#ms-head { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left; }
+#ms-title { color: var(--accent); font-weight: 700; font-size: 14px; }
+#ms-summary { color: var(--muted); font-size: 12px; flex: 1; }
+#missions.collapsed .chev { transform: rotate(-135deg); }
+#missions.collapsed #ms-body { display: none; }
+#ms-body { padding: 0 12px 10px; max-height: 30dvh; overflow-y: auto; }
+.ms-sec { margin: 6px 0 2px; font-size: 11px; color: var(--muted); }
+.ms-item { margin: 2px 0; font-size: 13px; line-height: 1.4; color: var(--fg); display: flex; gap: 6px; }
+.ms-item .ms-mark { flex: none; width: 16px; text-align: center; font-weight: 700; color: var(--low); }
+.ms-item.done { color: var(--muted); }
+.ms-item.done .ms-mark { color: #6abf4b; }
+.ms-how { margin: 2px 0 0 22px; font-size: 12px; color: #9fb3d9; }
+#stage.has-missions #toasts { bottom: 64px; }
+#stage.has-missions-open #toasts { bottom: 200px; }
+.ms-note { margin: 6px 0 2px; padding: 6px 8px; border-radius: 8px; background: rgba(224,73,63,0.18); color: #ffb4a8; font-size: 12px; line-height: 1.4; }

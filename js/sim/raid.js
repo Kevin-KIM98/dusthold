@@ -5,8 +5,8 @@
 
 import { CONFIG } from '../config.js';
 import { pushLog, pushEvent } from './log.js';
-import { withRng } from './rng.js';
-import { isNight } from './clock.js';
+import { withRng, createRng } from './rng.js';
+import { isNight, getDay, getTickInDay, DAY_TICKS, DAYLIGHT_TICKS } from './clock.js';
 import { combatPower, isInjured, setRest } from './survivors.js';
 import { recomputeGrid, workerMap } from './economy.js';
 import { spend, missingCost } from './resources.js';
@@ -88,26 +88,133 @@ export function doorMax(state) {
   return B.DOOR_LEVELS[state.door.level - 1].hp;
 }
 
+// ---------- 오늘 밤 계획 (plan v0.4: 새벽에 미리 정해 두어 낮에 미션으로 보여준다) ----------
+function rollPlan(rng, day) {
+  const side = rng.int(0, 3);
+  const types = [];
+  const us = [];
+  for (let k = 0; k < R.MAX; k++) { types.push(rollType(rng, day)); us.push(rng.next()); }
+  return { day, side, types, us };
+}
+
+/** 오늘 밤 좀비 명단을 정한다 (상태의 RNG를 쓴다). 새벽·새 게임·불러오기 때 */
+export function planNight(state, day) {
+  state.nightPlan = withRng(state, (rng) => rollPlan(rng, day));
+  return state.nightPlan;
+}
+
+/** 계획을 읽는다. 날이 안 맞으면(디버그로 시간을 건너뛴 경우 등) 상태를 바꾸지 않고 임시로 만든다 */
+function readPlan(state, day) {
+  const p = state.nightPlan;
+  if (p && p.day === day) return p;
+  return rollPlan(createRng(state.rng), day);
+}
+
+/** 오늘 밤 올 좀비 (종류·체력·도착 시간) */
+export function previewZombies(state, day) {
+  const plan = readPlan(state, day);
+  const n = getRaidSize(state, day);
+  return plan.types.slice(0, n).map((type, k) => ({
+    type, hp: zombieHp(type, day), arrive: RR.APPROACH_SEC / Z[type].speedMult + k * RR.STAGGER_SEC,
+  }));
+}
+
+/**
+ * 한 밤을 미리 돌려 본다. step()의 이동 → 방어(먼저 온 좀비부터) → 문 공격 순서와 계산을 그대로 따른다.
+ * zs = previewZombies 결과, dps = 경비·포탑 화력(밤새 그대로라고 본다)
+ */
+export function simulateNight(zs, doorHp, dps, practice) {
+  let list = zs.map((o) => ({ type: o.type, hp: o.hp, arrive: o.arrive, t: 0, phase: 'approach', order: 0 }));
+  let order = 1;
+  let hp = doorHp;
+  for (let i = 0; i < DAY_TICKS - DAYLIGHT_TICKS; i++) {
+    for (const q of list) {
+      if (q.phase !== 'approach') continue;
+      q.t += T.TICK_SEC;
+      if (q.t >= q.arrive - EPS) { q.phase = 'door'; q.order = order++; }
+    }
+    const front = list.filter((q) => q.phase !== 'approach').sort((a, b) => a.order - b.order);
+    let dmg = dps * T.TICK_SEC;
+    for (const q of front) {
+      if (dmg <= 0) break;
+      const d = Math.min(dmg, q.hp);
+      q.hp -= d;
+      dmg -= d;
+    }
+    list = list.filter((q) => q.hp > EPS);
+    let ddps = 0;
+    for (const q of list) if (q.phase === 'door') ddps += Z[q.type].doorDps;
+    if (ddps > 0) {
+      hp -= ddps * T.TICK_SEC;
+      if (practice) hp = Math.max(CONFIG.TUTORIAL.PRACTICE_DOOR_MIN_HP, hp);
+      if (hp <= 0) return { breached: true, doorHp: 0 };
+    }
+    if (list.length === 0) break;
+  }
+  return { breached: false, doorHp: hp };
+}
+
+/** 문이 버티는 최소 화력 (정수). 문 혼자 버티면 0, 상한으로도 안 되면 Infinity */
+export function minDefense(zs, doorHp, practice) {
+  if (!simulateNight(zs, doorHp, 0, practice).breached) return 0;
+  const MAX = CONFIG.MISSIONS.MAX_DPS;
+  if (simulateNight(zs, doorHp, MAX, practice).breached) return Infinity;
+  let lo = 0, hi = MAX; // lo: 부서짐, hi: 버팀
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (simulateNight(zs, doorHp, mid, practice).breached) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+const forecastCache = new Map();
+
+/**
+ * 오늘 밤 예보: { day, n, required, doorHp }.
+ * 낮이면 밤이 올 때까지의 문 회복을 넣어 계산(체력은 안전하게 내림), 밤이면 밤이 시작될 때 계산해 둔 값.
+ */
+export function nightForecast(state) {
+  const day = getDay(state);
+  const raid = state.raid;
+  if (raid && raid.day === day && (raid.active || isNight(state))) {
+    return { day, n: raid.size, required: raid.requiredDps || 0, doorHp: state.door.hp, night: true, repelled: !raid.active && !raid.breached };
+  }
+  const max = doorMax(state);
+  const regenTicks = Math.max(0, DAYLIGHT_TICKS - 1 - getTickInDay(state));
+  const projected = Math.min(max, state.door.hp + max * RR.DOOR_REGEN_PER_SEC * T.TICK_SEC * regenTicks);
+  const B = CONFIG.MISSIONS.DOOR_HP_BUCKET;
+  const hp = Math.max(1, Math.floor(projected / B) * B);
+  const zs = previewZombies(state, day);
+  const planned = state.nightPlan && state.nightPlan.day === day;
+  const key = [state.seed, day, planned ? 'p' : 't' + state.rng, zs.length, hp, zs.map((z) => z.type[0]).join('')].join('|');
+  let required = forecastCache.get(key);
+  if (required === undefined) {
+    required = minDefense(zs, hp, isPracticeDay(day));
+    if (forecastCache.size > 200) forecastCache.clear();
+    forecastCache.set(key, required);
+  }
+  return { day, n: zs.length, required, doorHp: projected, night: false };
+}
+
 // ---------- 시작 ----------
 /** 밤 시작 시 time.js가 부른다 */
 export function onNightStart(state, day) {
   const n = getRaidSize(state, day);
+  if (!state.nightPlan || state.nightPlan.day !== day) planNight(state, day);
+  const plan = state.nightPlan;
+  const zs = previewZombies(state, day);
   const raid = createRaid();
   raid.active = true;
   raid.day = day;
   raid.size = n;
-  withRng(state, (rng) => {
-    raid.side = rng.int(0, 3);
-    for (let k = 0; k < n; k++) {
-      const type = rollType(rng, day);
-      const hp = zombieHp(type, day);
-      const p = edgePoint(raid.side, rng.next());
-      raid.zombies.push({
-        id: raid.nextId++, type, hp, maxHp: hp, sx: p.x, sy: p.y,
-        t: 0, arrive: RR.APPROACH_SEC / Z[type].speedMult + k * RR.STAGGER_SEC,
-        phase: 'approach', order: 0,
-      });
-    }
+  raid.side = plan.side;
+  raid.requiredDps = minDefense(zs, state.door.hp, isPracticeDay(day)); // 이 밤의 필수 미션 기준 (정확한 문 체력)
+  zs.forEach((z, k) => {
+    const p = edgePoint(raid.side, plan.us[k]);
+    raid.zombies.push({
+      id: raid.nextId++, type: z.type, hp: z.hp, maxHp: z.hp, sx: p.x, sy: p.y,
+      t: 0, arrive: z.arrive, phase: 'approach', order: 0,
+    });
   });
   state.raid = raid;
   pushLog(state, 'log.raidStart', { n });

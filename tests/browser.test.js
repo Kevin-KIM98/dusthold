@@ -2,6 +2,7 @@
 // Playwright가 없으면 건너뛴다 (Node 테스트는 그래도 전부 돈다).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { CONFIG } from '../js/config.js';
 import { serve, loadPlaywright, sleep, nextFrame, collectErrors, skipHints } from './helpers/server.js';
 
 const playwright = loadPlaywright();
@@ -102,7 +103,7 @@ test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwrig
     const saved = JSON.parse(savedAfter);
     assert.ok(saved.time.tick >= tickBefore);
     assert.equal(saved.resources.scrap, 55);
-    assert.equal(saved.version, 6);
+    assert.equal(saved.version, CONFIG.SAVE.VERSION);
 
     await page.reload();
     await page.waitForSelector('#title:not([hidden])');

@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { t } from './strings.js';
 import { createState, serialize, deserialize } from './sim/state.js';
-import { advance, tick, setSpeed, togglePaused, setPaused, getDay, isFinished } from './sim/time.js';
+import { advance, tick, setSpeed, togglePaused, setPaused, getDay, isFinished, isNight } from './sim/time.js';
 import { createWorstState, occupiedCells } from './sim/worst.js';
 import { startExpedition, assignGatherer, unassign } from './sim/surface.js';
 import {
@@ -14,11 +14,11 @@ import { upgradeDoor } from './sim/raid.js';
 import {
   initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas,
   armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay, applyIconSprites,
-  renderGuide, pulsePanelButtons,
+  renderGuide, pulsePanelButtons, renderMissions,
 } from './render/ui.js';
 import { createSurfaceView } from './render/surfaceView.js';
 import { createBunkerView } from './render/bunkerView.js';
-import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText, tutorialModel, tutorialButtons } from './render/viewModel.js';
+import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText, tutorialModel, tutorialButtons, missionModel } from './render/viewModel.js';
 import { isTutorialActive, skipTutorial } from './sim/tutorial.js';
 import { initInput, initCanvasInput } from './input.js';
 import { loadSprites, spriteStats } from './render/sprites.js';
@@ -43,6 +43,8 @@ const app = {
   worst: false,     // F9 최악 장면 중 (저장 안 함)
   worstBackup: null,
   hintQueue: [],
+  missionsCollapsed: false, // 미션 카드 접힘
+  lastMustMet: null,        // 필수 미션 달성 여부 (바뀔 때 알림)
   hintPausedBefore: false,
 };
 
@@ -151,6 +153,8 @@ function startGame(state, opts = {}) {
   app.selected = -1;
   app.bsel = null;
   app.picker = null;
+  app.missionsCollapsed = false;
+  app.lastMustMet = null;
   app.surfaceView = createSurfaceView();
   app.bunkerView = createBunkerView();
   showGame();
@@ -236,8 +240,12 @@ function drainEvents() {
     else if (e.key.startsWith('outcome.')) showOutcome(e.key.slice('outcome.'.length));
     else {
       showToast(formatMessage(e.key, e.params));
-      if (e.key === 'toast.raidWarning') queueHint('raid');
-      if (e.key === 'toast.newDay') queueHint('goal');
+      if (e.key === 'toast.raidWarning') {
+        queueHint('raid');
+        const mm = missionModel(app.state);
+        if (mm && !mm.allMust) { showToast(t('toast.missionDanger')); app.missionsCollapsed = false; }
+      }
+      if (e.key === 'toast.newDay') { queueHint('goal'); app.missionsCollapsed = false; app.lastMustMet = null; }
     }
   }
   ev.length = 0;
@@ -395,6 +403,13 @@ function frame(ts) {
   renderPanel(currentPanelModel());
   renderGuide(guide, app.view);
   pulsePanelButtons(guide ? tutorialButtons(guide.step) : []);
+  const missions = app.worst || guide ? null : missionModel(app.state);
+  renderMissions(missions, app.view, app.missionsCollapsed);
+  if (missions) {
+    // 필수 미션을 막 다 지켰으면 알림 (밤이 되기 전)
+    if (app.lastMustMet === false && missions.allMust && !isNight(app.state)) showToast(t('toast.missionSafe'));
+    app.lastMustMet = missions.allMust;
+  }
   requestAnimationFrame(frame);
 }
 
@@ -409,6 +424,7 @@ const handlers = {
   onClose() { app.picker = null; app.selected = -1; app.bsel = null; closePanel(); },
   onPanelAction,
   onDebug() { toggleWorst(); },
+  onToggleMissions() { app.missionsCollapsed = !app.missionsCollapsed; },
   onSkipGuide() { if (app.state && skipTutorial(app.state)) { showToast(t('toast.tutorialSkipped')); saveNow(); } },
 };
 
@@ -498,7 +514,11 @@ function boot() {
     setPaused: (p) => setPaused(app.state, p),
     stepTicks(n) { for (let i = 0; i < n; i++) tick(app.state); drainEvents(); renderUI(app.state); },
     setTick(v) { app.state.time.tick = v; renderUI(app.state); },
-    render() { const g = tutorialModel(app.state); draw(performance.now(), g); renderUI(app.state); renderPanel(currentPanelModel()); renderGuide(g, app.view); },
+    render() {
+      const g = tutorialModel(app.state);
+      draw(performance.now(), g); renderUI(app.state); renderPanel(currentPanelModel()); renderGuide(g, app.view);
+      renderMissions(g ? null : missionModel(app.state), app.view, app.missionsCollapsed);
+    },
     get selected() { return app.selected; },
     get bsel() { return app.bsel; },
     get camera() { return app.surfaceView && app.surfaceView.camera; },

@@ -45,6 +45,7 @@ export function initUI(handlers) {
     b.title = label;
   }
   for (const b of el.tabs) b.textContent = t('tab.' + b.dataset.tab);
+  document.getElementById('ms-head').addEventListener('click', () => handlers.onToggleMissions());
   const skip = document.getElementById('gd-skip');
   skip.textContent = t('guide.skip');
   skip.addEventListener('click', () => handlers.onSkipGuide());
@@ -221,6 +222,49 @@ export function renderGuide(model, view) {
 function pulseTab(want, view) {
   if (want === view) return;
   for (const b of el.tabs) if (b.dataset.tab === want) b.classList.add('pulse');
+}
+
+// ---------- 일차별 미션 카드 ----------
+let lastMissionKey = null;
+
+/** model = missionModel() 결과 또는 null. collapsed = 접힘 */
+export function renderMissions(model, view, collapsed) {
+  const box = document.getElementById('missions');
+  const stage = document.getElementById('stage');
+  const key = model ? JSON.stringify(model) + view + collapsed : 'none' + view;
+  if (key === lastMissionKey) return;
+  lastMissionKey = key;
+  const show = !!model && view !== 'log';
+  box.hidden = !show;
+  stage.classList.toggle('has-missions', show);
+  stage.classList.toggle('has-missions-open', show && !collapsed);
+  if (!show) return;
+  box.classList.toggle('collapsed', collapsed);
+  box.classList.toggle('danger', !model.allMust);
+  document.getElementById('ms-head').setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  document.getElementById('ms-title').textContent = model.title;
+  document.getElementById('ms-summary').textContent = model.summary;
+  const body = document.getElementById('ms-body');
+  body.innerHTML = '';
+  if (model.note) body.appendChild(mkText('p', 'ms-note', model.note));
+  const item = (it) => {
+    const row = document.createElement('p');
+    row.className = 'ms-item' + (it.done ? ' done' : '');
+    row.appendChild(mkText('span', 'ms-mark', it.done ? '✓' : '!'));
+    row.appendChild(mkText('span', 'ms-text', it.text));
+    return row;
+  };
+  body.appendChild(mkText('p', 'ms-sec', t('mission.must')));
+  for (const it of model.must) body.appendChild(item(it));
+  if (model.how) body.appendChild(mkText('p', 'ms-how', model.how));
+  if (model.goals.length) {
+    body.appendChild(mkText('p', 'ms-sec', t('mission.goals')));
+    for (const it of model.goals) {
+      const row = item(it);
+      if (!it.done) row.querySelector('.ms-mark').textContent = '○';
+      body.appendChild(row);
+    }
+  }
 }
 
 /** 패널 안에서 selectors에 맞는 버튼만 반짝인다 */

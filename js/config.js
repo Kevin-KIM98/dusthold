@@ -4,7 +4,7 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 6,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구, 5: M5 결과·통계, 6: 1일차 가이드)
+    VERSION: 7,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구, 5: M5 결과·통계, 6: 1일차 가이드, 7: 일차별 미션)
     HINTS_KEY: 'dusthold.hints.v1', // 본 튜토리얼 힌트 (기기별, 저장 파일과 따로)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
@@ -205,6 +205,26 @@ export const CONFIG = Object.freeze({
     DIG_CELL: Object.freeze({ floor: 1, col: 6 }),   // 3·5단계: 정수실 오른쪽 칸 (굴착 → 경비실)
     EXPLORE_TILE: Object.freeze({ x: 5, y: 3 }),      // 4단계: 입구 바로 위 두 칸째 (항상 탐험 가능)
     PULSE_MS: 900,                 // 가리키는 곳 깜빡임 주기
+  }),
+
+  // ---------- 일차별 미션 (plan v0.4) ----------
+  MISSIONS: Object.freeze({
+    MAX_DPS: 400,                  // 필요 방어 화력 계산 상한 (이보다 크면 "지금 문으로는 어렵다")
+    DOOR_HP_BUCKET: 25,            // 계산을 아끼려고 예상 문 체력을 이 단위로 내림 (내리면 필요 화력이 조금 커져 안전한 쪽)
+    LAST_DAY: 10,                  // 이 날 이후는 이 날의 목표를 계속
+    // 목표: kind = build(room, n) · turret(n) · door(level) · explore(n) · armed(n) · nest(n) · baseFound · parts · radio
+    GOALS: Object.freeze({
+      1: Object.freeze([Object.freeze({ kind: 'explore', n: 2 })]),
+      2: Object.freeze([Object.freeze({ kind: 'build', room: 'farm', n: 1 }), Object.freeze({ kind: 'explore', n: 4 })]),
+      3: Object.freeze([Object.freeze({ kind: 'build', room: 'workshop', n: 1 }), Object.freeze({ kind: 'armed', n: 1 })]),
+      4: Object.freeze([Object.freeze({ kind: 'turret', n: 1 }), Object.freeze({ kind: 'door', level: 2 })]),
+      5: Object.freeze([Object.freeze({ kind: 'build', room: 'guard', n: 2 }), Object.freeze({ kind: 'explore', n: 10 })]),
+      6: Object.freeze([Object.freeze({ kind: 'armed', n: 3 }), Object.freeze({ kind: 'nest', n: 1 })]),
+      7: Object.freeze([Object.freeze({ kind: 'build', room: 'generator', n: 2 }), Object.freeze({ kind: 'build', room: 'medbay', n: 1 })]),
+      8: Object.freeze([Object.freeze({ kind: 'baseFound' }), Object.freeze({ kind: 'turret', n: 2 })]),
+      9: Object.freeze([Object.freeze({ kind: 'parts' }), Object.freeze({ kind: 'door', level: 3 })]),
+      10: Object.freeze([Object.freeze({ kind: 'radio' })]),
+    }),
   }),
 
   // ---------- 카메라·터치 ----------
