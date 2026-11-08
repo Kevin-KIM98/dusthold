@@ -13,7 +13,7 @@
 
 - 마일스톤 순서대로만 진행: **M1 뼈대 → M2 지상 → M3 벙커 → M4 습격 → M5 마무리 → M6 아트.**
 - 한 번에 한 마일스톤. 끝나면:
-  1. 해당 마일스톤의 완료 기준(plan.md ⑥)을 테스트로 확인 (`node --test tests/` + 브라우저 확인)
+  1. 해당 마일스톤의 완료 기준(plan.md ⑥)을 테스트로 확인 (`node --test` + 브라우저 확인)
   2. 실패한 항목은 원인을 고쳐 다시 돌린다 — 통과할 때까지
   3. `design/progress.md`에 날짜·한 일·통과한 기준·남은 문제를 적는다
   4. 커밋 후 영주에게 **결과만 짧게 보고**하고, 다음 마일스톤 진행 여부를 묻는다
@@ -57,5 +57,5 @@ assets/  tests/  design/{plan.md,progress.md}
 ## 실행·확인
 
 - 로컬: 저장소 폴더에서 `npx serve .` 또는 `python3 -m http.server 8000` → 브라우저로 열기
-- 테스트: `node --test tests/`
+- 테스트: `node --test` (또는 `npm test`) — Node 22는 폴더 지정(`node --test tests/`)을 받지 않아 기본 패턴 `tests/*.test.js`로 찾는다
 - 폰 확인: GitHub Pages(main 브랜치 루트) 켜서 링크로 열기

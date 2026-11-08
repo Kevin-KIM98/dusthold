@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#14181c">
+  <title>DUSTHOLD</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 타이틀 -->
+  <section id="title" class="screen">
+    <h1 id="title-name">DUSTHOLD</h1>
+    <p id="title-sub"></p>
+    <div class="title-buttons">
+      <button id="btn-continue" class="btn primary" type="button" hidden></button>
+      <button id="btn-new" class="btn" type="button"></button>
+    </div>
+  </section>
+
+  <!-- 게임 -->
+  <main id="game" class="screen" hidden>
+    <header id="hud">
+      <div id="topbar" aria-label="자원"></div>
+      <div id="clockbar">
+        <span id="clk-phase" class="phase" data-phase="day"></span>
+        <span id="clk-day"></span>
+        <span id="clk-time"></span>
+        <span id="clk-count" class="count"></span>
+        <div id="speed" role="group">
+          <button class="btn sm pause" type="button" data-speed="pause"></button>
+          <button class="btn sm" type="button" data-speed="1"></button>
+          <button class="btn sm" type="button" data-speed="2"></button>
+          <button class="btn sm" type="button" data-speed="3"></button>
+        </div>
+      </div>
+    </header>
+
+    <section id="stage">
+      <canvas id="view"></canvas>
+      <div id="log-view" hidden></div>
+      <div id="debug" hidden></div>
+    </section>
+
+    <section id="panel" class="collapsed">
+      <button id="panel-toggle" class="panel-head" type="button">
+        <span id="panel-title"></span>
+        <span class="chev"></span>
+      </button>
+      <div id="panel-body"></div>
+    </section>
+
+    <nav id="tabs">
+      <button class="tab active" type="button" data-tab="surface"></button>
+      <button class="tab" type="button" data-tab="bunker"></button>
+      <button class="tab" type="button" data-tab="log"></button>
+    </nav>
+  </main>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
