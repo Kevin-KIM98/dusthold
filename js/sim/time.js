@@ -1,18 +1,17 @@
 // 낮밤·배속·고정 타임스텝. DOM 금지.
 
 import { CONFIG } from '../config.js';
-import { pushLog, pushEvent } from './state.js';
-import { step as surfaceStep } from './surface.js';
+import { pushLog, pushEvent } from './log.js';
+import { DAY_TICKS, DAYLIGHT_TICKS, RAID_WARNING_TICKS, getDay } from './clock.js';
+import { step as surfaceStep, onNightStart as surfaceNight } from './surface.js';
 import { step as bunkerStep } from './bunker.js';
 import { step as raidStep } from './raid.js';
 import { step as economyStep } from './economy.js';
 
+export * from './clock.js';
+
 const T = CONFIG.TIME;
 const EPS = 1e-9;
-
-export const DAY_TICKS = Math.round(T.DAY_SEC / T.TICK_SEC);
-export const DAYLIGHT_TICKS = Math.round(T.DAYLIGHT_SEC / T.TICK_SEC);
-export const RAID_WARNING_TICKS = Math.round(T.RAID_WARNING_SEC / T.TICK_SEC);
 
 /** 1틱(0.1초) 진행 */
 export function tick(state) {
@@ -26,6 +25,7 @@ export function tick(state) {
   } else if (inDay === DAYLIGHT_TICKS) {
     pushLog(state, 'log.nightFalls', { day });
     pushEvent(state, 'toast.nightFalls', { day });
+    surfaceNight(state);
   } else if (inDay === DAYLIGHT_TICKS - RAID_WARNING_TICKS) {
     pushLog(state, 'log.raidWarning', { sec: T.RAID_WARNING_SEC });
     pushEvent(state, 'toast.raidWarning', { sec: T.RAID_WARNING_SEC });
@@ -69,40 +69,4 @@ export function setPaused(state, paused) {
 export function togglePaused(state) {
   state.paused = !state.paused;
   return state.paused;
-}
-
-/** 1일차부터 */
-export function getDay(state) {
-  return Math.floor(state.time.tick / DAY_TICKS) + 1;
-}
-
-export function getTickInDay(state) {
-  return state.time.tick % DAY_TICKS;
-}
-
-export function isNight(state) {
-  return getTickInDay(state) >= DAYLIGHT_TICKS;
-}
-
-export function getPhase(state) {
-  return isNight(state) ? 'night' : 'day';
-}
-
-/** 하루 안에서 흐른 초 */
-export function getDayElapsedSec(state) {
-  return getTickInDay(state) * T.TICK_SEC;
-}
-
-/** 시계 표시용 { hour, minute } — 하루 0초가 CLOCK_START_HOUR */
-export function getClock(state) {
-  const frac = getDayElapsedSec(state) / T.DAY_SEC;
-  const totalMin = Math.floor(((T.CLOCK_START_HOUR + frac * 24) % 24) * 60);
-  return { hour: Math.floor(totalMin / 60), minute: totalMin % 60 };
-}
-
-/** 낮이면 밤(습격)까지, 밤이면 새벽까지 남은 초 */
-export function getSecondsToPhaseChange(state) {
-  const inDay = getTickInDay(state);
-  const target = isNight(state) ? DAY_TICKS : DAYLIGHT_TICKS;
-  return (target - inDay) * T.TICK_SEC;
 }

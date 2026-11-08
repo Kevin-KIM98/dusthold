@@ -3,28 +3,21 @@
 
 import { CONFIG } from '../config.js';
 import { createRng } from './rng.js';
+import { pushLog, pushEvent } from './log.js';
+import { makeSurvivor } from './survivors.js';
+import { generateMap } from './surface.js';
+
+export { pushLog, pushEvent };
 
 const T = CONFIG.TIME;
 
 /** 새 게임 상태를 만든다. seed는 정수. */
 export function createState(seed) {
   const rng = createRng(seed);
-  const names = rng.shuffle(CONFIG.SURVIVOR.NAMES);
-  const survivors = [];
-  for (let i = 0; i < CONFIG.START.SURVIVORS; i++) {
-    survivors.push({
-      id: i + 1,
-      name: names[i % names.length],
-      specialty: CONFIG.SURVIVOR.SPECIALTIES[i % CONFIG.SURVIVOR.SPECIALTIES.length],
-      hp: CONFIG.SURVIVOR.HP,
-      job: 'rest',
-    });
-  }
-
   const state = {
     version: CONFIG.SAVE.VERSION,
     seed: Number(seed) >>> 0,
-    rng: rng.getState(),
+    rng: 0,
     time: { tick: 0, acc: 0 },
     speed: T.DEFAULT_SPEED,
     paused: false,
@@ -32,23 +25,20 @@ export function createState(seed) {
     storageCap: CONFIG.START.STORAGE_CAP,
     power: { produced: 0, consumed: 0 },
     popCap: CONFIG.START.POP_CAP,
-    survivors,
-    log: [],       // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
-    events: [],    // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
+    survivors: [],
+    waiting: [],     // 인구 상한 초과로 입구에서 대기 중인 생존자
+    nextSurvivorId: 1,
+    surface: generateMap(seed),
+    log: [],         // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
+    events: [],      // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
   };
-  pushLog(state, 'log.start', { n: survivors.length });
-  return state;
-}
-
-export function pushLog(state, key, params) {
-  state.log.push({ tick: state.time.tick, key, params: params || null });
-  if (state.log.length > CONFIG.UI.LOG_MAX) {
-    state.log.splice(0, state.log.length - CONFIG.UI.LOG_MAX);
+  const specs = CONFIG.SURVIVOR.SPECIALTIES;
+  for (let i = 0; i < CONFIG.START.SURVIVORS; i++) {
+    state.survivors.push(makeSurvivor(state, rng, specs[i % specs.length]));
   }
-}
-
-export function pushEvent(state, key, params) {
-  state.events.push({ key, params: params || null });
+  state.rng = rng.getState();
+  pushLog(state, 'log.start', { n: state.survivors.length });
+  return state;
 }
 
 /** 저장용 JSON 문자열 */
@@ -78,11 +68,23 @@ export function deserialize(json) {
   return migrated;
 }
 
-/** 옛 버전 저장을 현재 버전으로 올린다. 올릴 수 없으면 null. */
+/** 옛 버전 저장을 현재 버전으로 한 단계씩 올린다. 올릴 수 없으면 null. */
 export function migrate(raw) {
-  if (raw.version === CONFIG.SAVE.VERSION) return raw;
-  // 아직 이전 버전이 없다. 버전이 바뀌면 여기에 단계별 변환을 추가한다.
-  return null;
+  let s = raw;
+  if (s.version === 1) {
+    // v1(M1) → v2(M2): 지상 맵·대기열·생존자 필드 추가. 맵은 시드로 다시 만든다.
+    const survivors = Array.isArray(s.survivors) ? s.survivors : [];
+    s = {
+      ...s,
+      version: 2,
+      survivors: survivors.map((v) => ({ jobTile: null, weapon: false, ...v, job: 'rest' })),
+      waiting: [],
+      nextSurvivorId: survivors.reduce((m, v) => Math.max(m, v.id || 0), 0) + 1,
+      surface: generateMap(s.seed),
+    };
+  }
+  if (s.version !== CONFIG.SAVE.VERSION) return null;
+  return s;
 }
 
 function isValidState(s) {
@@ -90,7 +92,11 @@ function isValidState(s) {
     s.time && Number.isFinite(s.time.tick) &&
     s.resources && typeof s.resources === 'object' &&
     Array.isArray(s.survivors) &&
+    Array.isArray(s.waiting) &&
     Array.isArray(s.log) &&
+    s.surface && Array.isArray(s.surface.tiles) &&
+    s.surface.tiles.length === s.surface.size * s.surface.size &&
+    Array.isArray(s.surface.expeditions) &&
     T.SPEEDS.includes(s.speed) &&
     typeof s.paused === 'boolean'
   );

@@ -4,7 +4,7 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 1,                    // 저장 구조 버전. 구조가 바뀌면 올린다.
+    VERSION: 2,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵 추가)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
 
@@ -41,6 +41,72 @@ export const CONFIG = Object.freeze({
   }),
 
   RESOURCE_ORDER: Object.freeze(['food', 'water', 'wood', 'scrap', 'power', 'parts']),
+
+  // ---------- 지상 (plan.md ① 지상 타일) ----------
+  SURFACE: Object.freeze({
+    SIZE: 11,                      // 11×11, 중앙 = 벙커 입구 (링 0)
+    MAP_SEED_SALT: 0x9e3779b9,     // 맵 전용 난수 줄기 (같은 시드 = 같은 맵)
+    START_REVEAL_RING: 1,          // 시작 시 링 1까지(8칸) 밝힘
+    START_GUARANTEE: Object.freeze(['forest', 'ruins', 'farm']), // 시작 8칸에 반드시 1개씩
+    EXPEDITION_SEC_PER_RING: 20,   // 원정 소요 = 20초 × 링 (왕복 포함)
+    EXPEDITION_MIN: 1,
+    EXPEDITION_MAX: 3,
+    GATHER_SPECIALTY_BONUS: 0.5,   // 채집 특기 +50%
+    // 타일 종류. deposit null = 무한. reward = 탐험 보상. gather = 채집 (perDay = /일/인)
+    TILES: Object.freeze({
+      forest:    Object.freeze({ minRing: 1, reward: Object.freeze({ wood: 15 }),  gather: Object.freeze({ res: 'wood', perDay: 6 }),  deposit: 120 }),
+      ruins:     Object.freeze({ minRing: 1, reward: Object.freeze({ scrap: 10 }), gather: Object.freeze({ res: 'scrap', perDay: 4 }), deposit: 80 }),
+      farm:      Object.freeze({ minRing: 1, reward: Object.freeze({ food: 10 }),  gather: Object.freeze({ res: 'food', perDay: 5 }),  deposit: 100 }),
+      reservoir: Object.freeze({ minRing: 2, reward: Object.freeze({ water: 15 }), gather: Object.freeze({ res: 'water', perDay: 6 }), deposit: null }),
+      box:       Object.freeze({ minRing: 1, oneTime: true, randomReward: Object.freeze({ min: 20, max: 40, pool: Object.freeze(['food', 'water', 'wood', 'scrap']) }) }),
+      camp:      Object.freeze({ minRing: 2, oneTime: true, survivors: Object.freeze({ min: 1, max: 2 }) }),
+      nest:      Object.freeze({ minRing: 2, powerPerRing: 10, clearReward: Object.freeze({ scrap: 30 }), raidBonus: 2, raidBonusMaxRing: 3 }),
+      // 군 기지: 맵에 1곳 고정, 요구 전투력 45 (plan v0.1 그대로. 3명 최대 전투력과의 관계는 progress.md 메모 참고)
+      base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 45, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
+    }),
+    // 링별 등장 비율 (가중치). 군 기지는 따로 1곳 배치.
+    RING_WEIGHTS: Object.freeze({
+      1: Object.freeze({ forest: 30, ruins: 25, farm: 25, box: 20 }),
+      2: Object.freeze({ forest: 22, ruins: 18, farm: 15, reservoir: 14, box: 10, camp: 8, nest: 13 }),
+      3: Object.freeze({ forest: 20, ruins: 18, farm: 14, reservoir: 12, box: 10, camp: 8, nest: 18 }),
+      4: Object.freeze({ forest: 20, ruins: 18, farm: 12, reservoir: 10, box: 8, camp: 8, nest: 24 }),
+      5: Object.freeze({ forest: 18, ruins: 18, farm: 10, reservoir: 10, box: 8, camp: 8, nest: 28 }),
+    }),
+  }),
+
+  // ---------- 전투 (원정 즉시 판정) ----------
+  COMBAT: Object.freeze({
+    BASE_POWER: 5,
+    SPECIALTY_POWER: 8,            // 전투 특기
+    WEAPON_POWER: 5,               // 무기 소지 시 +5 (작업장 제작, M3)
+    CLOSE_FIGHT_MARGIN: 0.5,       // 이겼어도 전투력이 요구치×(1+0.5) 미만이면 (여유가 요구치의 50% 미만)
+    CLOSE_FIGHT_HP_LOSS: 20,       // 1명 체력 -20
+  }),
+
+  // ---------- 습격 마릿수 공식 (plan.md ③) — 좀비 자체는 M4 ----------
+  RAID: Object.freeze({
+    BASE: 4,
+    PER_DAY: 2,
+    // 둥지 1곳당 +마릿수·적용 링은 SURFACE.TILES.nest(raidBonus, raidBonusMaxRing)
+    MAX: 40,
+    BIG_EVERY_DAYS: 5,
+    BIG_MULT: 1.5,
+  }),
+
+  // ---------- 카메라·터치 ----------
+  CAMERA: Object.freeze({
+    TILE_PX: 56,                   // 줌 1일 때 타일 한 변
+    ZOOM_MIN: 0.6,
+    ZOOM_MAX: 2.0,
+    WHEEL_STEP: 0.1,
+    CACHE_SCALE: 2,                // 정적 타일 레이어 캐시 해상도 배율
+    PAN_MARGIN_TILES: 1,           // 맵 밖으로 끌 수 있는 여유
+  }),
+  TOUCH: Object.freeze({
+    TAP_MAX_PX: 8,                 // 이보다 적게 움직이면 탭
+    TAP_MAX_MS: 400,
+    LONG_PRESS_MS: 500,
+  }),
 
   UI: Object.freeze({
     DPR_MAX: 2,                    // devicePixelRatio 상한

@@ -2,45 +2,16 @@
 // Playwright가 없으면 건너뛴다 (Node 테스트는 그래도 전부 돈다).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { serve, loadPlaywright, sleep, nextFrame, collectErrors } from './helpers/server.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(import.meta.url);
-
-let playwright = null;
-try { playwright = require('playwright'); } catch { playwright = null; }
-
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
-
-function serve() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      const url = decodeURIComponent(req.url.split('?')[0]);
-      let p = path.join(ROOT, url === '/' ? '/index.html' : url);
-      if (!p.startsWith(ROOT) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-      fs.createReadStream(p).pipe(res);
-    });
-    server.listen(0, '127.0.0.1', () => resolve({ server, url: `http://127.0.0.1:${server.address().port}/` }));
-  });
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+const playwright = loadPlaywright();
 
 test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwright 없음 — 브라우저 테스트 건너뜀', timeout: 120000 }, async (tc) => {
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-  page.on('requestfailed', (r) => errors.push('requestfailed: ' + r.url()));
+  const errors = collectErrors(page);
 
   try {
     // ① 타이틀 → 게임 화면, 콘솔 에러 0건
@@ -130,7 +101,7 @@ test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwrig
     const saved = JSON.parse(savedAfter);
     assert.ok(saved.time.tick >= tickBefore);
     assert.equal(saved.resources.scrap, 55);
-    assert.equal(saved.version, 1);
+    assert.equal(saved.version, 2);
 
     await page.reload();
     await page.waitForSelector('#title:not([hidden])');

@@ -39,3 +39,12 @@ export function createRng(seed) {
   };
   return rng;
 }
+
+/** 상태에 저장된 RNG를 꺼내 쓰고 다시 넣는다. */
+export function withRng(state, fn) {
+  const r = createRng(1);
+  r.setState(state.rng);
+  const out = fn(r);
+  state.rng = r.getState();
+  return out;
+}

@@ -82,6 +82,20 @@ body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
 #panel.collapsed .chev { transform: rotate(-135deg); }
 #panel-body { padding: 0 14px 12px; color: var(--muted); font-size: 14px; max-height: 30dvh; overflow-y: auto; }
 #panel.collapsed #panel-body { display: none; }
+#panel-body { max-height: 38dvh; }
+.pn-line { margin: 2px 0 6px; color: var(--fg); }
+.pn-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.pn-reason { color: var(--low); font-size: 13px; }
+.pn-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.pn-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); }
+.pn-item { font-size: 13px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.picker { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.pk-title { margin: 0; color: var(--fg); font-weight: 700; }
+.pk-row { text-align: left; width: 100%; font-size: 13px; }
+.pk-row.selected { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); background: #2a2a1e; }
+.pk-summary { margin: 2px 0 0; color: var(--fg); }
+.picker .pn-actions { position: sticky; bottom: -12px; background: var(--bg2); padding: 8px 0 12px; margin-bottom: -12px; border-top: 1px solid var(--line); }
 
 #tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; background: var(--bg2); border-top: 1px solid var(--line); padding-bottom: var(--sa-b); }
 .tab { min-height: var(--tab-h); border: 0; background: none; font-size: 15px; cursor: pointer; border-radius: 0; }

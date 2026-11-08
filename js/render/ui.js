@@ -2,10 +2,11 @@
 
 import { CONFIG } from '../config.js';
 import { t } from '../strings.js';
-import { topBarModel, clockModel, logModel } from './viewModel.js';
+import { topBarModel, clockModel, logModel, panelKey } from './viewModel.js';
 
 const el = {};
 let lastRendered = { bar: null, clock: null, logLen: -1, logLast: null };
+let lastPanelKey = null;
 
 export function initUI(handlers) {
   const q = (id) => document.getElementById(id);
@@ -74,6 +75,94 @@ export function initUI(handlers) {
   }
   for (const b of el.tabs) b.addEventListener('click', () => handlers.onTab(b.dataset.tab));
   el.panelToggle.addEventListener('click', () => el.panel.classList.toggle('collapsed'));
+  // 패널 안 버튼은 data-action / data-arg 로 위임
+  el.panelBody.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-action]');
+    if (!b || b.disabled) return;
+    const arg = b.dataset.arg === undefined ? undefined : Number(b.dataset.arg);
+    handlers.onPanelAction(b.dataset.action, arg);
+  });
+}
+
+export function openPanel() {
+  el.panel.classList.remove('collapsed');
+}
+
+function mkButton(btn, cls) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn ' + (cls || '') + (btn.primary ? ' primary' : '');
+  b.dataset.action = btn.action;
+  if (btn.arg !== undefined) b.dataset.arg = String(btn.arg);
+  b.textContent = btn.label;
+  if (btn.enabled === false) b.disabled = true;
+  return b;
+}
+
+function mkText(tag, cls, text) {
+  const n = document.createElement(tag);
+  n.className = cls;
+  n.textContent = text;
+  return n;
+}
+
+/** 선택 패널. model이 null이면 "선택한 대상이 없습니다". 바뀐 경우에만 DOM을 다시 만든다. */
+export function renderPanel(model) {
+  const key = panelKey(model);
+  if (key === lastPanelKey) return;
+  lastPanelKey = key;
+  const body = el.panelBody;
+  body.innerHTML = '';
+  if (!model) {
+    document.getElementById('panel-title').textContent = t('panel.title');
+    body.appendChild(mkText('p', 'pn-line', t('panel.none')));
+    return;
+  }
+  const title = document.getElementById('panel-title');
+  title.textContent = model.title + (model.sub ? ' · ' + model.sub : '');
+  for (const line of model.lines) body.appendChild(mkText('p', 'pn-line', line));
+
+  if (model.actions.length > 0 && !model.picker) {
+    const row = document.createElement('div');
+    row.className = 'pn-actions';
+    for (const a of model.actions) {
+      row.appendChild(mkButton(a));
+      if (!a.enabled && a.reason) row.appendChild(mkText('span', 'pn-reason', a.reason));
+    }
+    body.appendChild(row);
+  }
+  if (model.list.length > 0) {
+    const ul = document.createElement('ul');
+    ul.className = 'pn-list';
+    for (const it of model.list) {
+      const li = document.createElement('li');
+      li.appendChild(mkText('span', 'pn-item', it.text));
+      li.appendChild(mkButton({ action: it.action, arg: it.arg, label: it.label, enabled: true }, 'sm'));
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+  }
+  if (model.picker) {
+    const pk = model.picker;
+    const box = document.createElement('div');
+    box.className = 'picker';
+    box.appendChild(mkText('p', 'pk-title', pk.title));
+    if (pk.empty) box.appendChild(mkText('p', 'pn-reason', pk.empty));
+    if (pk.summary) box.appendChild(mkText('p', 'pk-summary', pk.summary));
+    if (pk.warn) box.appendChild(mkText('p', 'pn-reason', pk.warn));
+    for (const r of pk.rows) {
+      const b = mkButton({ action: r.action, arg: r.arg, label: r.text, enabled: true }, 'pk-row' + (r.selected ? ' selected' : ''));
+      b.setAttribute('aria-pressed', r.selected ? 'true' : 'false');
+      box.appendChild(b);
+    }
+    const btns = document.createElement('div');
+    btns.className = 'pn-actions';
+    if (pk.depart) btns.appendChild(mkButton({ ...pk.depart, primary: true }));
+    btns.appendChild(mkButton({ action: 'cancel', label: t('action.cancel'), enabled: true }));
+    if (pk.depart && !pk.depart.enabled && pk.depart.reason) btns.appendChild(mkText('span', 'pn-reason', pk.depart.reason));
+    box.appendChild(btns);
+    body.appendChild(box);
+  }
 }
 
 export function showTitle(hasSave) {
@@ -176,6 +265,10 @@ function renderLog(state) {
     ul.appendChild(li);
   }
   el.logView.appendChild(ul);
+}
+
+export function isPanelOpen() {
+  return !el.panel.classList.contains('collapsed') && !el.panel.hidden;
 }
 
 export function showToast(text) {
