@@ -59,3 +59,5 @@ assets/  tests/  design/{plan.md,progress.md}
 - 로컬: 저장소 폴더에서 `npx serve .` 또는 `python3 -m http.server 8000` → 브라우저로 열기
 - 테스트: `node --test` (또는 `npm test`) — Node 22는 폴더 지정(`node --test tests/`)을 받지 않아 기본 패턴 `tests/*.test.js`로 찾는다
 - 폰 확인: GitHub Pages(main 브랜치 루트) 켜서 링크로 열기
+- 성능 확인: 게임 중 `F9` 또는 주소 뒤에 `?worst` → 최악 장면 + FPS 표시 (저장 안 됨)
+- 밸런스 확인: `node tools/balance.js [시드 수] [최대 일수]` → 자동 플레이어로 여러 판을 끝까지 돌린 결과 표

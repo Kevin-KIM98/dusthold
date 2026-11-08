@@ -4,7 +4,8 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 4,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구)
+    VERSION: 5,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구, 5: M5 결과·통계)
+    HINTS_KEY: 'dusthold.hints.v1', // 본 튜토리얼 힌트 (기기별, 저장 파일과 따로)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
 
@@ -31,8 +32,8 @@ export const CONFIG = Object.freeze({
     HP: 100,
     INJURED_HP: 40,
     STARVE_HP_LOSS: 30,            // 새벽 정산 때 식량·물이 모자란 인원 체력 감소 (각각)
-    FOOD_PER_DAY: 2,
-    WATER_PER_DAY: 2,
+    FOOD_PER_DAY: 1,               // v0.2 밸런싱: 2 → 1
+    WATER_PER_DAY: 1,              // v0.2 밸런싱: 2 → 1
     SPECIALTIES: Object.freeze(['gather', 'build', 'combat', 'tech']),
     // 오리지널 이름 풀 (원작 캐릭터 이름 사용 금지)
     NAMES: Object.freeze([
@@ -60,12 +61,13 @@ export const CONFIG = Object.freeze({
     WORK_SPECIALTY_BONUS: 0.5,     // 방 근무 특기 효율 +50%
     STAGE_FRAME_AT: 0.5,           // 공사 진행 50%부터 골조 그림 (그 전은 비계)
     // use = 전력 소비, perWorker = 근무자 1명당 전력 생산, workers = 근무 최대
+    // v0.2 밸런싱: 발전실 6 → 10, 정수실·수경재배실 4 → 10
     // specialty = 이 방에서 +50% 효율을 내는 특기 (기획서는 "특기 일 배치 시 +50%"만 정함 → 짝은 여기서 정함)
     ROOMS: Object.freeze({
       shaft:     Object.freeze({ w: 1, cost: Object.freeze({ wood: 10 }), sec: 10, use: 0, workers: 0 }),
-      generator: Object.freeze({ w: 2, cost: Object.freeze({ scrap: 25, wood: 10 }), sec: 30, use: 0, perWorker: 6, workers: 2, specialty: 'tech' }),
-      water:     Object.freeze({ w: 2, cost: Object.freeze({ scrap: 15, wood: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'water', perDay: 4 }), specialty: 'tech' }),
-      farm:      Object.freeze({ w: 2, cost: Object.freeze({ wood: 20, scrap: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'food', perDay: 4 }), specialty: 'gather' }),
+      generator: Object.freeze({ w: 2, cost: Object.freeze({ scrap: 25, wood: 10 }), sec: 30, use: 0, perWorker: 10, workers: 2, specialty: 'tech' }),
+      water:     Object.freeze({ w: 2, cost: Object.freeze({ scrap: 15, wood: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'water', perDay: 10 }), specialty: 'tech' }),
+      farm:      Object.freeze({ w: 2, cost: Object.freeze({ wood: 20, scrap: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'food', perDay: 10 }), specialty: 'gather' }),
       quarters:  Object.freeze({ w: 2, cost: Object.freeze({ wood: 20 }), sec: 20, use: 1, workers: 0, popCap: 4 }),
       storage:   Object.freeze({ w: 1, cost: Object.freeze({ wood: 15 }), sec: 15, use: 0, workers: 0, storageCap: 100 }),
       workshop:  Object.freeze({ w: 2, cost: Object.freeze({ wood: 20, scrap: 20 }), sec: 30, use: 4, workers: 2, specialty: 'tech' }),
@@ -111,6 +113,15 @@ export const CONFIG = Object.freeze({
     MAX_PARTICLES: 150,            // 성능 상한
   }),
 
+  // 성능 측정용 최악 장면 (plan.md ⑥ 성능): 지상 전부 밝힘 + 벙커 40칸 + 좀비 40 + 파티클 150
+  WORST: Object.freeze({
+    SEED: 4242,
+    DAY: 20,                       // 이 날의 습격 = 최대 40마리
+    ROOMS_PER_FLOOR: Object.freeze([Object.freeze({ type: 'generator', col: 1 }), Object.freeze({ type: 'farm', col: 4 })]),
+    WARMUP_TICKS: 80,              // 일부는 문 앞, 일부는 다가오는 중
+    URL_PARAM: 'worst',            // 폰에서 index.html?worst 로 열면 바로 최악 장면
+  }),
+
   // ---------- 지상 (plan.md ① 지상 타일) ----------
   SURFACE: Object.freeze({
     SIZE: 11,                      // 11×11, 중앙 = 벙커 입구 (링 0)
@@ -122,11 +133,12 @@ export const CONFIG = Object.freeze({
     EXPEDITION_MAX: 3,
     GATHER_SPECIALTY_BONUS: 0.5,   // 채집 특기 +50%
     // 타일 종류. deposit null = 무한. reward = 탐험 보상. gather = 채집 (perDay = /일/인)
+    // v0.2 밸런싱: 채집량 숲 6→12·폐허 4→24·농지 5→10·저수지 6→12, 폐허 보상 10→20·매장량 80→200
     TILES: Object.freeze({
-      forest:    Object.freeze({ minRing: 1, reward: Object.freeze({ wood: 15 }),  gather: Object.freeze({ res: 'wood', perDay: 6 }),  deposit: 120 }),
-      ruins:     Object.freeze({ minRing: 1, reward: Object.freeze({ scrap: 10 }), gather: Object.freeze({ res: 'scrap', perDay: 4 }), deposit: 80 }),
-      farm:      Object.freeze({ minRing: 1, reward: Object.freeze({ food: 10 }),  gather: Object.freeze({ res: 'food', perDay: 5 }),  deposit: 100 }),
-      reservoir: Object.freeze({ minRing: 2, reward: Object.freeze({ water: 15 }), gather: Object.freeze({ res: 'water', perDay: 6 }), deposit: null }),
+      forest:    Object.freeze({ minRing: 1, reward: Object.freeze({ wood: 15 }),  gather: Object.freeze({ res: 'wood', perDay: 12 }),  deposit: 120 }),
+      ruins:     Object.freeze({ minRing: 1, reward: Object.freeze({ scrap: 20 }), gather: Object.freeze({ res: 'scrap', perDay: 24 }), deposit: 200 }),
+      farm:      Object.freeze({ minRing: 1, reward: Object.freeze({ food: 10 }),  gather: Object.freeze({ res: 'food', perDay: 10 }),  deposit: 100 }),
+      reservoir: Object.freeze({ minRing: 2, reward: Object.freeze({ water: 15 }), gather: Object.freeze({ res: 'water', perDay: 12 }), deposit: null }),
       box:       Object.freeze({ minRing: 1, oneTime: true, randomReward: Object.freeze({ min: 20, max: 40, pool: Object.freeze(['food', 'water', 'wood', 'scrap']) }) }),
       camp:      Object.freeze({ minRing: 2, oneTime: true, survivors: Object.freeze({ min: 1, max: 2 }) }),
       nest:      Object.freeze({ minRing: 2, powerPerRing: 10, clearReward: Object.freeze({ scrap: 30 }), raidBonus: 2, raidBonusMaxRing: 3 }),
@@ -134,10 +146,11 @@ export const CONFIG = Object.freeze({
       base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 35, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
     }),
     // 링별 등장 비율 (가중치). 군 기지는 따로 1곳 배치.
+    // v0.2 밸런싱: 링 2~3은 둥지를 드물게(첫날 밤 습격 마릿수), 생존자 캠프를 자주(인구 증가)
     RING_WEIGHTS: Object.freeze({
       1: Object.freeze({ forest: 30, ruins: 25, farm: 25, box: 20 }),
-      2: Object.freeze({ forest: 22, ruins: 18, farm: 15, reservoir: 14, box: 10, camp: 8, nest: 13 }),
-      3: Object.freeze({ forest: 20, ruins: 18, farm: 14, reservoir: 12, box: 10, camp: 8, nest: 18 }),
+      2: Object.freeze({ forest: 22, ruins: 18, farm: 15, reservoir: 14, box: 10, camp: 18, nest: 2 }),
+      3: Object.freeze({ forest: 20, ruins: 18, farm: 14, reservoir: 12, box: 10, camp: 14, nest: 4 }),
       4: Object.freeze({ forest: 20, ruins: 18, farm: 12, reservoir: 10, box: 8, camp: 8, nest: 24 }),
       5: Object.freeze({ forest: 18, ruins: 18, farm: 10, reservoir: 10, box: 8, camp: 8, nest: 28 }),
     }),
@@ -154,7 +167,8 @@ export const CONFIG = Object.freeze({
 
   // ---------- 습격 (plan.md ①좀비, ③적 AI) ----------
   ZOMBIES: Object.freeze({
-    normal: Object.freeze({ hpBase: 20, hpPerDay: 3, hpMult: 1, doorDps: 2, speedMult: 1, fromDay: 1, chance: 1 }),
+    // v0.2 밸런싱: 일반 좀비 체력 증가 3/일 → 2/일
+    normal: Object.freeze({ hpBase: 20, hpPerDay: 2, hpMult: 1, doorDps: 2, speedMult: 1, fromDay: 1, chance: 1 }),
     runner: Object.freeze({ hpMult: 0.6, doorDps: 2, speedMult: 2, fromDay: 3, chance: 0.2 }),
     brute:  Object.freeze({ hpMult: 3, doorDps: 6, speedMult: 1, fromDay: 5, chance: 0.1 }),
   }),
@@ -163,7 +177,8 @@ export const CONFIG = Object.freeze({
     STAGGER_SEC: 0.25,             // 한 마리씩 줄지어 오게 하는 간격
     DOOR_REGEN_PER_SEC: 0.01,      // 낮 동안 방폭문 초당 1% 회복
     ROOM_BREAK_HP: 60,             // 침입 좀비가 방 하나를 고장 내는 데 필요한 피해 (좀비의 방폭문 피해와 같은 단위)
-    CONTACT_DPS: 20,               // 공격받는 방에서 일하던 생존자 초당 체력 감소 (부상이면 빠져나감)
+    CONTACT_DPS: 20,               // 공격받는 방에 있던 생존자 접촉 1초당 체력 감소
+    CONTACT_SEC: 1,                // 접촉 시간: 이만큼 맞고 나면 그 방에서 대피 (휴식)
     DAWN_FIGHT_HP_LOSS: 15,        // 새벽에 남은 침입 좀비를 처치하며 전원 체력 감소
   }),
   RAID: Object.freeze({
@@ -206,6 +221,6 @@ export const CONFIG = Object.freeze({
     KEY_SPEED: Object.freeze({ '1': 1, '2': 2, '3': 3 }),
     KEY_TOGGLE_VIEW: 'Tab',
     KEY_CLOSE: 'Escape',
-    KEY_DEBUG: 'F9',
+    KEY_DEBUG: 'F9',               // 최악 장면 + FPS (다시 누르면 원래 게임으로)
   }),
 });

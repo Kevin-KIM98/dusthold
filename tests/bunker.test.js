@@ -13,6 +13,11 @@ import { topBarModel } from '../js/render/viewModel.js';
 
 const B = CONFIG.BUNKER;
 const SC = B.SHAFT_COL; // 3
+const GEN = B.ROOMS.generator.perWorker;           // 발전실 근무자 1명당 전력
+const TECH = 1 + B.WORK_SPECIALTY_BONUS;           // 특기 효율
+const PROD = B.ROOMS.water.produce.perDay;         // 정수실·수경재배실 근무자 1명당 /일
+const FOOD = CONFIG.SURVIVOR.FOOD_PER_DAY;
+const WATER = CONFIG.SURVIVOR.WATER_PER_DAY;
 const ticks = (state, n) => { for (let i = 0; i < n; i++) tick(state); };
 const secTicks = (sec) => Math.round(sec / CONFIG.TIME.TICK_SEC);
 const rich = (s) => { Object.assign(s.resources, { food: 150, water: 150, wood: 150, scrap: 150 }); };
@@ -181,47 +186,51 @@ test('⑥ 발전실에 근무자를 넣으면 전력 생산이 오르고, 빼면
   assert.equal(s.power.produced, 0);
   const [a, b] = notSpec(s, 'tech', 2);
   assert.equal(assignWorker(s, a.id, gen(s).id).ok, true);
-  assert.equal(s.power.produced, 6, '1명 +6');
+  assert.equal(s.power.produced, GEN, '1명');
   assert.equal(assignWorker(s, b.id, gen(s).id).ok, true);
-  assert.equal(s.power.produced, 12, '2명 +12');
+  assert.equal(s.power.produced, GEN * 2, '2명');
   const t = bySpec(s, 'tech');
   assert.equal(assignWorker(s, t.id, gen(s).id).reason, 'reason.full', '근무 최대 2');
   unassignBunker(s, b.id);
-  assert.equal(s.power.produced, 6, '빼면 내려감');
+  assert.equal(s.power.produced, GEN, '빼면 내려감');
   unassignBunker(s, a.id);
   assert.equal(s.power.produced, 0);
   assignWorker(s, t.id, gen(s).id);
-  assert.equal(s.power.produced, 9, '기술 특기 +50%');
+  assert.equal(s.power.produced, GEN * TECH, '기술 특기 +50%');
   // 상단 바에 반영
   const bar = topBarModel(s).find((i) => i.id === 'power');
-  assert.equal(bar.text, '9/3');
+  assert.equal(bar.text, `${GEN * TECH}/3`);
 });
 
 // ---------- ⑥-5 ----------
 test('⑥ 전력이 부족하면 우선순위 낮은 방부터 꺼진다', () => {
   const s = createState(10);
   rich(s);
-  // 2층: 샤프트 오른쪽에 수경재배실(4-5), 왼쪽에 숙소(1-2)
+  // 수요가 발전실 1명 생산보다 커질 때까지 방을 붙인다 (숙소는 맨 마지막 = 우선순위 가장 낮음)
   debugPlaceRoom(s, 'farm', 2, 4);
-  debugPlaceRoom(s, 'quarters', 2, 1);
-  // 수요: 정수 3 + 재배 3 + 숙소 1 = 7
-  assert.equal(s.power.consumed, 7);
+  let f = 3;
+  while (s.power.consumed + B.ROOMS.quarters.use <= GEN) {
+    debugPlaceRoom(s, 'shaft', f, SC);
+    debugPlaceRoom(s, 'workshop', f, SC + 1);
+    f++;
+  }
+  const q = debugPlaceRoom(s, 'quarters', 2, 1);
+  assert.ok(s.power.consumed > GEN, `수요 ${s.power.consumed} > 1명 생산 ${GEN}`);
   const [a] = notSpec(s, 'tech', 1);
-  assignWorker(s, a.id, gen(s).id); // 생산 6 < 7
-  const on = (type) => s.bunker.rooms.find((r) => r.type === type).on;
+  assignWorker(s, a.id, gen(s).id); // 생산 GEN < 수요
+  const on = (type) => s.bunker.rooms.filter((r) => r.type === type).every((r) => r.on);
+  assert.equal(q.on, false, '숙소(가장 낮음)부터 꺼짐');
   assert.equal(on('water'), true, '정수실(우선순위 높음) 켜짐');
-  assert.equal(on('farm'), true, '수경재배실 켜짐');
-  assert.equal(on('quarters'), false, '숙소(가장 낮음)부터 꺼짐');
-  assert.equal(s.power.used, 6);
+  assert.ok(s.power.used <= s.power.produced, '켜진 방 소비 ≤ 생산');
   unassignBunker(s, a.id); // 생산 0
   assert.equal(on('water'), false);
   assert.equal(on('farm'), false);
-  assert.equal(on('quarters'), false);
-  // 생산 6, 수요 7에서 숙소를 빼면 3+3=6 딱 맞음
-  assignWorker(s, a.id, gen(s).id);
-  const [b] = notSpec(s, 'tech', 2).slice(1);
-  assignWorker(s, b.id, gen(s).id); // 12
-  assert.ok(['water', 'farm', 'quarters'].every(on), '충분하면 전부 켜짐');
+  assert.equal(q.on, false);
+  // 충분하면 전부 켜짐: 작업장을 치우고 발전실 2명
+  s.bunker.rooms = s.bunker.rooms.filter((r) => r.type !== 'workshop');
+  for (const v of notSpec(s, 'tech', 2)) assignWorker(s, v.id, gen(s).id);
+  assert.ok(s.power.produced >= s.power.consumed);
+  assert.ok(on('water') && on('farm') && q.on, '충분하면 전부 켜짐');
 });
 
 test('전력 우선순위: 경비실 > 정수실 > 수경재배실 > 의무실 > 작업장 > 숙소 > 무선실', () => {
@@ -296,7 +305,7 @@ test('⑥ 정수실·수경재배실 근무자가 있으면 물·식량이 늘�
   const farm = debugPlaceRoom(s, 'farm', 2, SC + 1);
   const [g1, g2] = s.survivors.filter((v) => v.specialty === 'combat' || v.specialty === 'build');
   assignWorker(s, g1.id, gen(s).id);
-  assignWorker(s, g2.id, gen(s).id); // 12 ≥ 6
+  assignWorker(s, g2.id, gen(s).id); // 2명 ≥ 정수 3 + 재배 3
   ticks(s, 600);
   assert.equal(s.resources.water, 0, '근무자 없으면 물 그대로');
   assert.equal(s.resources.food, 0);
@@ -305,9 +314,10 @@ test('⑥ 정수실·수경재배실 근무자가 있으면 물·식량이 늘�
   assignWorker(s, t.id, water(s).id);
   assignWorker(s, g.id, farm.id);
   ticks(s, 1200); // 120초 = 반나절
-  // 정수실 기술 특기: 4 × 1.5 × 0.5일 = 3, 수경재배실 채집 특기: 4 × 1.5 × 0.5일 = 3
-  assert.ok(Math.abs(s.resources.water - 3) <= 1, `물 ${s.resources.water}`);
-  assert.ok(Math.abs(s.resources.food - 3) <= 1, `식량 ${s.resources.food}`);
+  // 특기 근무자 1명: 하루 PROD × 1.5, 반나절이면 그 절반
+  const expect = Math.floor(PROD * TECH * 0.5);
+  assert.ok(Math.abs(s.resources.water - expect) <= 1, `물 ${s.resources.water} (기대 ${expect})`);
+  assert.ok(Math.abs(s.resources.food - expect) <= 1, `식량 ${s.resources.food} (기대 ${expect})`);
   // 전력이 끊기면 멈춘다
   unassignBunker(s, g1.id); unassignBunker(s, g2.id);
   const w = s.resources.water;
@@ -353,7 +363,7 @@ test('⑥ 식량이나 물이 0인 채로 새벽이 오면 생존자 체력이 3
   assert.ok(s.survivors.every((v) => v.hp === 100), '새벽 전엔 그대로');
   ticks(s, 1);
   assert.ok(s.survivors.every((v) => v.hp === 70), '식량 0 → 전원 -30');
-  assert.equal(s.resources.water, 20 - 4 * 2, '물은 정상 소비');
+  assert.equal(s.resources.water, 20 - 4 * WATER, '물은 정상 소비');
   assert.ok(s.log.some((e) => e.key === 'log.starve' && e.params.res === 'food'));
 
   const s2 = noRaid(createState(18));
@@ -363,11 +373,11 @@ test('⑥ 식량이나 물이 0인 채로 새벽이 오면 생존자 체력이 3
   assert.ok(s2.survivors.every((v) => v.hp === 40), '둘 다 0 → -60');
 });
 
-test('새벽 정산: 1인당 식량 2·물 2, 일부만 모자라면 모자란 인원만, 체력 0이면 사망', () => {
+test('새벽 정산: 1인당 식량·물 하루치, 일부만 모자라면 모자란 인원만, 체력 0이면 사망', () => {
   const s = noRaid(createState(19));
-  s.resources.food = 5; // 2명분 + 1
+  s.resources.food = FOOD * 2 + (FOOD > 1 ? 1 : 0); // 2명분 (+ 남는 1)
   ticks(s, DAY_TICKS);
-  assert.equal(s.resources.food, 1);
+  assert.equal(s.resources.food, FOOD > 1 ? 1 : 0);
   assert.equal(s.survivors.filter((v) => v.hp === 70).length, 2, '2명만 굶음');
   const s2 = noRaid(createState(20));
   s2.survivors[0].hp = 30;
@@ -377,7 +387,7 @@ test('새벽 정산: 1인당 식량 2·물 2, 일부만 모자라면 모자란 �
   assert.ok(s2.log.some((e) => e.key === 'log.death'));
   // 밤 시작 굶주림 경고
   const s3 = noRaid(createState(21));
-  s3.resources.water = 3;
+  s3.resources.water = 4 * WATER - 1;
   ticks(s3, CONFIG.TIME.DAYLIGHT_SEC * 10);
   assert.ok(s3.events.some((e) => e.key === 'toast.hungerWarn'));
 });
@@ -433,7 +443,7 @@ test('길게 눌러 옮기기: 방 → 다른 방, 자리가 없으면 원래대
   assert.equal(c.jobRef, water(s).id, '실패하면 그대로');
   assert.equal(moveSurvivor(s, a.id, water(s).id).ok, true);
   assert.equal(workersOf(s, water(s).id).length, 2);
-  assert.equal(s.power.produced, 6);
+  assert.equal(s.power.produced, GEN, "발전실 1명만 남음");
   debugDig(s, 2, SC + 1);
   const st = startBuild(s, 'storage', 2, SC + 1);
   assert.equal(moveSurvivor(s, b.id, st.id).ok, true, '공사로도 옮길 수 있다');

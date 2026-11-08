@@ -7,7 +7,7 @@ import { CONFIG } from '../config.js';
 import { pushLog, pushEvent } from './log.js';
 import { withRng } from './rng.js';
 import { isNight } from './clock.js';
-import { combatPower, isInjured } from './survivors.js';
+import { combatPower, isInjured, setRest } from './survivors.js';
 import { recomputeGrid, workerMap } from './economy.js';
 import { spend, missingCost } from './resources.js';
 
@@ -129,6 +129,14 @@ export function intrusionTarget(state) {
   return list[0] || null;
 }
 
+/** 지금 침입 좀비가 부수고 있는 방인가 (그 방에는 사람을 보낼 수 없다) */
+export function isUnderAttack(state, roomId) {
+  const raid = state.raid;
+  if (!raid || !raid.active || !raid.zombies.some((z) => z.phase === 'inside')) return false;
+  const t = intrusionTarget(state);
+  return !!t && t.id === roomId;
+}
+
 // ---------- 틱 ----------
 export function step(state) {
   const door = state.door;
@@ -162,6 +170,7 @@ export function step(state) {
   const before = raid.zombies.length;
   raid.zombies = raid.zombies.filter((z) => z.hp > EPS);
   raid.killed += before - raid.zombies.length;
+  state.stats.killed += before - raid.zombies.length;
 
   // 3) 방폭문 공격
   if (!raid.breached) {
@@ -189,8 +198,12 @@ export function step(state) {
   if (inside.length > 0) {
     const target = intrusionTarget(state);
     if (target) {
+      // 그 방에 있던 사람: 접촉 시간(CONTACT_SEC) 동안 초당 -20, 그다음 대피
       for (const s of state.survivors) {
-        if ((s.job === 'room' || s.job === 'build') && s.jobRef === target.id) s.hp = Math.max(0, s.hp - RR.CONTACT_DPS * T.TICK_SEC);
+        if ((s.job !== 'room' && s.job !== 'build') || s.jobRef !== target.id) continue;
+        s.hp = Math.max(0, s.hp - RR.CONTACT_DPS * T.TICK_SEC);
+        s.contact = (s.contact || 0) + T.TICK_SEC;
+        if (s.contact >= RR.CONTACT_SEC - EPS) { s.contact = 0; setRest(s); }
       }
       let dps = 0;
       for (const z of inside) dps += Z[z.type].doorDps;

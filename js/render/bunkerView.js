@@ -137,6 +137,9 @@ export function createBunkerView() {
     view.cache.height = Math.round(ws.h * s);
     const g = view.cache.getContext('2d');
     g.setTransform(s, 0, 0, s, 0, 0);
+    // 하늘 (낮·밤에 따라) — 캐시에 같이 구워서 매 프레임 덧칠을 줄인다
+    g.fillStyle = isNight(state) ? PAL.skyNight : PAL.sky;
+    g.fillRect(0, 0, ws.w, V.SKY_H);
     // 흙 (깊을수록 어둡게)
     const top = V.SKY_H;
     const grad = g.createLinearGradient(0, top, 0, ws.h);
@@ -164,30 +167,36 @@ export function createBunkerView() {
         g.fillRect(r.x + 2, r.y + 3, r.w - 4, r.h - 6);
       }
     }
-    view.cacheKey = state.bunker.rev;
+    // 완공된 방
+    for (const room of state.bunker.rooms) if (room.done && !roomDef(room.type).attach) drawRoomStatic(g, room);
+    view.cacheKey = cacheKeyOf(state);
     view.cacheState = state;
   }
+
+  const cacheKeyOf = (state) => state.bunker.rev + (isNight(state) ? 'n' : 'd') + '|' + roomsSignature(state);
 
   view.invalidate = () => { view.cacheKey = null; };
 
   /** ui: { selected: {kind,floor,col}|null, now: ms, paused } */
   view.draw = (ctx, w, h, state, ui) => {
     if (!view.camera.fitted) view.fit(w, h);
-    if (view.cacheKey !== state.bunker.rev || view.cacheState !== state) rebuildCache(state);
+    if (view.cacheKey !== cacheKeyOf(state) || view.cacheState !== state) rebuildCache(state);
     const now = ui.now || 0;
     const dt = view.lastNow ? Math.min(0.1, (now - view.lastNow) / 1000) : 0;
     view.lastNow = now;
     const zz = z();
     const S = (wx, wy) => view.toScreen(wx, wy, w, h);
 
-    ctx.fillStyle = PAL.bg;
-    ctx.fillRect(0, 0, w, h);
-    // 하늘
+    // 캐시(하늘·흙·파낸 칸)를 한 번에, 그 바깥 여백만 배경색 (덧칠 줄이기)
     const o = S(0, 0);
-    ctx.fillStyle = isNight(state) ? PAL.skyNight : PAL.sky;
-    ctx.fillRect(o.x, o.y, ws.w * zz, (V.SKY_H - V.GRASS_H) * zz);
-    // 캐시
-    ctx.drawImage(view.cache, o.x, o.y, ws.w * zz, ws.h * zz);
+    const ww = ws.w * zz, wh = ws.h * zz;
+    ctx.fillStyle = PAL.bg;
+    if (o.y > 0) ctx.fillRect(0, 0, w, o.y);
+    if (o.y + wh < h) ctx.fillRect(0, o.y + wh, w, h - o.y - wh);
+    if (o.x > 0) ctx.fillRect(0, 0, o.x, h);
+    if (o.x + ww < w) ctx.fillRect(o.x + ww, 0, w - o.x - ww, h);
+    ctx.imageSmoothingQuality = 'low';
+    ctx.drawImage(view.cache, o.x, o.y, ww, wh);
 
     drawSurface(ctx, state, S, zz, now);
     drawCables(ctx, state, S, zz);
@@ -357,12 +366,8 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
     });
     return;
   }
+  // 완공된 방의 바탕·가구·꺼짐·고장 표시는 캐시(drawRoomStatic)에 있다. 여기선 사람과 진행바만.
   const def = roomDef(r.type);
-  ctx.fillStyle = PAL.rooms[r.type];
-  ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
-  drawFurniture(ctx, r, x, y, w, h, zz, now);
-  if (r.type !== 'shaft') drawLabel(ctx, x, y, zz, t('room.' + r.type), !r.on);
-  // 근무자
   const workers = workersOf(state, r.id);
   const slots = Math.max(def.workers, 1);
   workers.forEach((s, k) => {
@@ -371,7 +376,6 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
     drawPerson(ctx, fx, fy, zz, s, r.on ? Math.sin(now / 300 + k) * 0.5 : 0);
     view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
   });
-  // 제작·수리 진행
   if (r.craft) drawBar(ctx, x, y, w, h, zz, r.craft.progress);
   if (r.repairing) {
     drawScaffold(ctx, x, y, w, h, zz, 0.6);
@@ -383,29 +387,55 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
       view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
     });
   }
-  // 고장 / 꺼짐 / 끊김
-  if (r.broken) {
-    ctx.fillStyle = PAL.off;
-    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
-    drawCracks(ctx, x, y, w, h, zz);
-  } else if (r.damage > 0) {
-    ctx.fillStyle = `rgba(200,40,30,${0.15 + 0.35 * r.damage / CONFIG.RAID_RULES.ROOM_BREAK_HP})`;
-    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
+}
+
+const DAMAGE_STEPS = 4;
+function damageStep(r) {
+  return r.damage > 0 ? Math.min(DAMAGE_STEPS, 1 + Math.floor((r.damage / CONFIG.RAID_RULES.ROOM_BREAK_HP) * DAMAGE_STEPS)) : 0;
+}
+
+/** 캐시를 다시 그려야 하는 방 상태 */
+export function roomsSignature(state) {
+  let out = '';
+  for (const r of state.bunker.rooms) {
+    if (!r.done || roomDef(r.type).attach) continue;
+    out += r.id + (r.on ? 'o' : 'f') + (r.connected ? 'c' : 'x') + (r.broken ? 'b' : '') + damageStep(r) + ',';
   }
+  return out;
+}
+
+/** 완공된 방의 정적인 부분 (캐시용, 월드 좌표, zz = 1) */
+function drawRoomStatic(ctx, r) {
+  const rr = cellRect(r.floor, r.col);
+  const x = rr.x, y = rr.y, w = rr.w * r.w, h = rr.h, zz = 1;
+  const def = roomDef(r.type);
+  ctx.fillStyle = PAL.rooms[r.type];
+  ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
+  drawFurniture(ctx, r, x, y, w, h, zz, 0);
+  if (r.type !== 'shaft') drawLabel(ctx, x, y, zz, t('room.' + r.type), !r.on);
   if (r.broken) {
-    // 고장 표시가 우선
-  } else if (!r.on && r.type !== 'shaft') {
     ctx.fillStyle = PAL.off;
-    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
-    drawBolt(ctx, x + w - 14 * zz, y + 16 * zz, 9 * zz, r.connected ? PAL.bolt : PAL.boltOff, !r.connected);
+    ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
+    drawCracks(ctx, x, y, w, h, zz);
+    return;
+  }
+  const ds = damageStep(r);
+  if (ds > 0) {
+    ctx.fillStyle = `rgba(200,40,30,${0.15 + 0.35 * ds / DAMAGE_STEPS})`;
+    ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
+  }
+  if (!r.on && r.type !== 'shaft') {
+    ctx.fillStyle = PAL.off;
+    ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
+    drawBolt(ctx, x + w - 14, y + 16, 9, r.connected ? PAL.bolt : PAL.boltOff, !r.connected);
   } else if (r.on && r.type !== 'shaft' && def.use > 0) {
     // 켜진 방 천장등
     ctx.fillStyle = 'rgba(255,230,140,0.12)';
     ctx.beginPath();
-    ctx.moveTo(x + w / 2 - 6 * zz, y + 8 * zz);
-    ctx.lineTo(x + w / 2 + 6 * zz, y + 8 * zz);
-    ctx.lineTo(x + w / 2 + 24 * zz, y + h - 4 * zz);
-    ctx.lineTo(x + w / 2 - 24 * zz, y + h - 4 * zz);
+    ctx.moveTo(x + w / 2 - 6, y + 8);
+    ctx.lineTo(x + w / 2 + 6, y + 8);
+    ctx.lineTo(x + w / 2 + 24, y + h - 4);
+    ctx.lineTo(x + w / 2 - 24, y + h - 4);
     ctx.closePath();
     ctx.fill();
   }

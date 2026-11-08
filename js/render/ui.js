@@ -299,6 +299,54 @@ export function setDebug(visible, text) {
   if (visible && text !== undefined) el.debug.textContent = text;
 }
 
+// ---------- 결과·힌트 카드 ----------
+let overlayHandler = null;
+
+/**
+ * spec = { variant: 'result'|'hint', title, sub, stats: [[라벨, 값]], buttons: [{ id, label, primary }] }
+ * onButton(id) 는 버튼을 누르면 불린다.
+ */
+export function showOverlay(spec, onButton) {
+  const ov = document.getElementById('overlay');
+  ov.className = spec.variant === 'hint' ? 'hint' : '';
+  document.getElementById('ov-title').textContent = spec.title;
+  document.getElementById('ov-sub').textContent = spec.sub || '';
+  const dl = document.getElementById('ov-stats');
+  dl.innerHTML = '';
+  for (const [k, v] of spec.stats || []) {
+    dl.appendChild(mkText('dt', '', k));
+    dl.appendChild(mkText('dd', '', v));
+  }
+  const box = document.getElementById('ov-buttons');
+  box.innerHTML = '';
+  for (const b of spec.buttons) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn' + (b.primary ? ' primary' : '');
+    btn.dataset.ov = b.id;
+    btn.textContent = b.label;
+    box.appendChild(btn);
+  }
+  overlayHandler = onButton;
+  ov.hidden = false;
+}
+
+export function hideOverlay() {
+  document.getElementById('overlay').hidden = true;
+  overlayHandler = null;
+}
+
+export function isOverlayOpen() {
+  return !document.getElementById('overlay').hidden;
+}
+
+export function initOverlay() {
+  document.getElementById('ov-buttons').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-ov]');
+    if (b && overlayHandler) overlayHandler(b.dataset.ov);
+  });
+}
+
 export function getCanvas() {
   return el.canvas;
 }

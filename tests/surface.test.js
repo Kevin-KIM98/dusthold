@@ -51,12 +51,10 @@ test('맵: 군 기지는 링 4~5에 정확히 1곳, 타일은 등장 링을 지�
   }
 });
 
-test('맵: 매장량 — 숲 120·폐허 80·농지 100·저수지 무한', () => {
+test('맵: 매장량은 config대로, 저수지는 무한', () => {
   const m = generateMap(5);
   for (const t of m.tiles) {
-    if (t.type === 'forest') assert.equal(t.deposit, 120);
-    if (t.type === 'ruins') assert.equal(t.deposit, 80);
-    if (t.type === 'farm') assert.equal(t.deposit, 100);
+    if (['forest', 'ruins', 'farm'].includes(t.type)) assert.equal(t.deposit, S.TILES[t.type].deposit);
     if (t.type === 'reservoir') assert.equal(t.deposit, null);
   }
 });
@@ -133,9 +131,10 @@ test('⑥ 원정대를 보내면 링 거리×20초 후 귀환하며 타일이 �
   }
 });
 
-test('탐험 보상: 폐허 고철10·농지 식량10·저수지 물15·상자 20~40·캠프 생존자 1~2', () => {
+test('탐험 보상: 폐허·농지·저수지는 config 보상, 상자 20~40, 캠프 생존자 1~2', () => {
   const s = createState(12);
-  const cases = [['ruins', 'scrap', 10, 5, 3], ['farm', 'food', 10, 7, 5], ['reservoir', 'water', 15, 3, 5]];
+  const rw = (type, res) => S.TILES[type].reward[res];
+  const cases = [['ruins', 'scrap', rw('ruins', 'scrap'), 5, 3], ['farm', 'food', rw('farm', 'food'), 7, 5], ['reservoir', 'water', rw('reservoir', 'water'), 3, 5]];
   for (const [type, res, n, x, y] of cases) {
     const i = idx(s, x, y);
     setTile(s, i, type);
@@ -198,7 +197,8 @@ test('저장 상한 150: 넘치는 보상은 버려진다', () => {
 
 // ---------- ⑥-4 ----------
 test('⑥ 숲·폐허·농지에 생존자를 배치하면 낮 동안 자원이 쌓이고 매장량이 줄어든다', () => {
-  for (const [type, res, perDay] of [['forest', 'wood', 6], ['ruins', 'scrap', 4], ['farm', 'food', 5]]) {
+  for (const [type, res] of [['forest', 'wood'], ['ruins', 'scrap'], ['farm', 'food']]) {
+    const perDay = S.TILES[type].gather.perDay;
     const s = createState(21);
     const i = s.surface.tiles.findIndex((t) => t.type === type && t.revealed);
     assert.ok(i >= 0, type + ' 시작 8칸에 있음');
@@ -223,7 +223,7 @@ test('채집 특기는 +50%, 빼기 하면 멈춘다', () => {
   const w0 = s.resources.wood;
   ticks(s, 1600); // 160초
   const got = s.resources.wood - w0;
-  const expected = Math.floor(6 * 1.5 * (160 / 240)); // 6
+  const expected = Math.floor(S.TILES.forest.gather.perDay * (1 + S.GATHER_SPECIALTY_BONUS) * (160 / CONFIG.TIME.DAY_SEC));
   assert.ok(Math.abs(got - expected) <= 1, `특기 ${got} (기대 ${expected})`);
   assert.equal(unassign(s, g.id).ok, true);
   const w1 = s.resources.wood;

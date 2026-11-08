@@ -1,7 +1,7 @@
 // 브라우저 확인: M2 지상을 실제로 탭·드래그·휠·핀치로 조작해 본다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serve, loadPlaywright, nextFrame, collectErrors } from './helpers/server.js';
+import { serve, loadPlaywright, nextFrame, collectErrors, skipHints } from './helpers/server.js';
 
 const playwright = loadPlaywright();
 const N = 11;
@@ -11,6 +11,7 @@ test('브라우저: 지상 맵 — 탭으로 탐험·채집, 밤 귀환, 드래�
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await skipHints(ctx);
   const page = await ctx.newPage();
   const errors = collectErrors(page);
 

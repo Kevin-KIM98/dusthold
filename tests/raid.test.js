@@ -73,10 +73,12 @@ test('마릿수: 링 3 이내 미제거 둥지 1곳당 +2, 최대 40', () => {
 });
 
 test('좀비 종류: 1~2일차는 일반만, 3일차부터 돌격형, 5일차부터 거구 / 체력 공식', () => {
-  assert.equal(zombieHp('normal', 1), 23);
-  assert.equal(zombieHp('normal', 4), 32);
-  assert.equal(zombieHp('runner', 5), Math.round(35 * 0.6));
-  assert.equal(zombieHp('brute', 5), 105);
+  const Zc = CONFIG.ZOMBIES;
+  const normal = (d) => Zc.normal.hpBase + Zc.normal.hpPerDay * d;
+  assert.equal(zombieHp('normal', 1), normal(1));
+  assert.equal(zombieHp('normal', 4), normal(4));
+  assert.equal(zombieHp('runner', 5), Math.round(normal(5) * Zc.runner.hpMult));
+  assert.equal(zombieHp('brute', 5), Math.round(normal(5) * Zc.brute.hpMult));
   const count = (day, seeds) => {
     const c = { normal: 0, runner: 0, brute: 0 };
     for (let k = 0; k < seeds; k++) {
@@ -166,13 +168,20 @@ test('포탑: 최대 2기, 전력 4씩, 경비·포탑은 전력 우선순위 �
   startTurret(s);
   assert.equal(canBuildTurret(s).reason, 'reason.turretMax');
   for (const t of turrets(s)) { t.done = true; t.progress = 1; }
-  power(s, 1); // 생산 6: 포탑 4 + 정수 3 = 7 → 하나 꺼짐
   const [t1, t2] = turrets(s);
   const water = s.bunker.rooms.find((r) => r.type === 'water');
-  assert.equal(s.power.consumed, 4 + 4 + 3);
-  assert.equal(t1.on, true, '포탑이 정수실보다 먼저 켜진다');
-  assert.equal(water.on, false);
-  assert.equal(t2.on, false);
+  const tu = B.ROOMS.turret.use, wu = B.ROOMS.water.use;
+  // 발전실 1명 생산으로: 우선순위 뒤(정수실)부터 꺼진다
+  power(s, 1);
+  assert.equal(s.power.consumed, tu * 2 + wu);
+  const P = s.power.produced;
+  const order = [t1, t2, water];
+  let used = tu * 2 + wu;
+  const expectOn = new Map(order.map((r) => [r, true]));
+  for (let k = order.length - 1; k >= 0 && used > P; k--) { expectOn.set(order[k], false); used -= order[k] === water ? wu : tu; }
+  for (const r of order) assert.equal(r.on, expectOn.get(r), `생산 ${P}: ${r.type}#${r.id}`);
+  assert.ok(!water.on || t1.on, '포탑이 정수실보다 먼저 켜진다');
+  if (P < tu * 2 + wu) assert.equal(water.on, false, '모자라면 정수실이 먼저 꺼진다');
 });
 
 // ---------- ⑥-3 ----------
@@ -200,7 +209,8 @@ test('⑥ 방폭문이 부서지면 1층 방이 고장 나고 생존자가 다�
   assert.equal(s.power.produced, 0);
   // 그 방에서 일하던 사람이 다쳤다
   for (const v of [w1, w2, w3]) assert.ok(v.hp < 100, `${v.name} 체력 ${v.hp.toFixed(0)}`);
-  assert.ok([w1, w2, w3].every((v) => v.hp <= CONFIG.SURVIVOR.INJURED_HP + 1e-9), '부상 상태로 빠져나옴');
+  assert.ok([w1, w2, w3].every((v) => Math.abs(v.hp - (100 - RR.CONTACT_DPS * RR.CONTACT_SEC)) < 0.5), '접촉 1초 = 체력 -20');
+  assert.ok([w1, w2, w3].every((v) => v.job === 'rest'), '맞고 나서 그 방에서 대피');
   // 새벽: 남은 좀비를 모두가 처치, 전원 체력 -15
   const hpBefore = s.survivors.map((v) => v.hp);
   ticks(s, DAY_TICKS - (s.time.tick % DAY_TICKS));
@@ -291,7 +301,7 @@ test('⑥ 5일차 습격이 평소의 1.5배 규모다', () => {
 });
 
 // ---------- 저장 ----------
-test('습격 중 저장·복원, v3 저장은 v4로 올라간다', () => {
+test('습격 중 저장·복원, v3 저장은 최신 버전으로 올라간다', () => {
   const s = noNests(createState(150));
   toNight(s, 2);
   tick(s);
@@ -308,7 +318,7 @@ test('습격 중 저장·복원, v3 저장은 v4로 올라간다', () => {
   v3.bunker.rooms = v3.bunker.rooms.map(({ repairing, damage, ...rest }) => rest);
   const up = deserialize(JSON.stringify(v3));
   assert.ok(up);
-  assert.equal(up.version, 4);
+  assert.equal(up.version, CONFIG.SAVE.VERSION);
   assert.equal(up.raid.active, false);
   assert.ok(up.survivors.every((v) => v.tool === false && v.gear === false));
 });
@@ -345,7 +355,9 @@ test('도구: 채집 +25%, 공사에 도구 가진 사람이 있으면 건설 +2
     return s.resources.wood - w0;
   };
   const plain = run(false), tooled = run(true);
-  assert.ok(Math.abs(plain - 4) <= 1 && Math.abs(tooled - 5) <= 1, `채집 ${plain} → ${tooled}`);
+  const perDay = CONFIG.SURFACE.TILES.forest.gather.perDay;
+  const e0 = perDay * (160 / CONFIG.TIME.DAY_SEC);
+  assert.ok(Math.abs(plain - e0) <= 1 && Math.abs(tooled - e0 * (1 + B.TOOL_SPEED_BONUS)) <= 1, `채집 ${plain} → ${tooled}`);
 
   const build = (withTool) => {
     const s = createState(162);

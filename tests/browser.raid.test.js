@@ -1,14 +1,17 @@
 // 브라우저 확인: M4 습격 — 방폭문 패널에서 포탑·강화, 밤 습격, 문 파괴·고장·수리를 실제 화면으로.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serve, loadPlaywright, nextFrame, collectErrors } from './helpers/server.js';
+import { CONFIG } from '../js/config.js';
+import { serve, loadPlaywright, nextFrame, collectErrors, skipHints } from './helpers/server.js';
 
 const playwright = loadPlaywright();
+const GEN = CONFIG.BUNKER.ROOMS.generator.perWorker;
 
 test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파괴·방 고장·수리', { skip: !playwright && 'playwright 없음', timeout: 120000 }, async () => {
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await skipHints(ctx);
   const page = await ctx.newPage();
   const errors = collectErrors(page);
   const st = (fn, arg) => page.evaluate(fn, arg);
@@ -42,7 +45,7 @@ test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파
       await page.locator('[data-action="assign"]').nth(0).click();
       await nextFrame(page);
     }
-    assert.equal(await page.textContent('#topbar .res[data-res="power"] .val'), '12/3');
+    assert.equal(await page.textContent('#topbar .res[data-res="power"] .val'), `${GEN * 2}/3`);
 
     // 방폭문 패널: 체력 300 · Lv1 → 강화 → 600
     await tapDoor();
@@ -61,7 +64,7 @@ test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파
     await nextFrame(page);
     assert.ok((await body()).includes('자동 포탑 1/2기'), await body());
     assert.ok((await body()).includes('방어 화력 초당 8'));
-    assert.equal(await page.textContent('#topbar .res[data-res="power"] .val'), '12/7', '포탑 전력 -4');
+    assert.equal(await page.textContent('#topbar .res[data-res="power"] .val'), `${GEN * 2}/7`, '포탑 전력 -4');
 
     // 1일차 밤: 4마리가 가장자리에서 등장 → 입구로
     await st(() => { DUSTHOLD.setTick(1799); DUSTHOLD.stepTicks(1); });

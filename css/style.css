@@ -13,6 +13,8 @@
   --sa-t: env(safe-area-inset-top, 0px);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#log-view { -webkit-user-select: text; user-select: text; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; overscroll-behavior: none; }
 body { display: flex; flex-direction: column; height: 100dvh; }
 [hidden] { display: none !important; }
@@ -37,7 +39,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- 게임 ---------- */
 #game { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-#hud { padding: calc(6px + var(--sa-t)) 8px 6px; background: var(--bg2); border-bottom: 1px solid var(--line); }
+#hud { padding: calc(6px + var(--sa-t)) 6px 6px; background: var(--bg2); border-bottom: 1px solid var(--line); }
 #topbar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .res { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; line-height: 1.1; color: var(--muted); min-height: var(--touch); justify-content: center; }
 .res .val { font-size: 14px; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
@@ -54,12 +56,12 @@ button { font: inherit; color: inherit; }
 .ico-parts { background: #c77dff; border-radius: 50%; border: 3px solid #5c2a82; }
 .ico-pop { background: var(--fg); border-radius: 50% 50% 4px 4px; }
 
-#clockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; font-size: 13px; min-height: var(--touch); white-space: nowrap; }
+#clockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 4px; font-size: 12px; min-height: var(--touch); white-space: nowrap; }
 #clockbar .phase { width: 14px; height: 14px; border-radius: 50%; background: #ffd54f; flex: none; font-size: 0; }
 #clockbar .phase[data-phase="night"] { background: #9fb3d9; box-shadow: inset 4px -2px 0 0 var(--bg2); }
 #clk-day { font-weight: 700; margin-left: 2px; }
 #clk-time { font-variant-numeric: tabular-nums; }
-#clockbar .count { color: var(--muted); font-size: 12px; margin-left: 4px; }
+#clockbar .count { color: var(--muted); font-size: 11px; margin-left: 2px; }
 body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
 #speed { display: flex; gap: 2px; margin-left: auto; }
 #speed .btn { font-size: 12px; padding: 0; min-width: var(--touch); position: relative; }
@@ -120,3 +122,19 @@ body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
   #title, #game { width: 100%; max-width: 480px; }
   #game { height: 100%; box-shadow: 0 0 0 1px var(--line); }
 }
+
+/* 결과·힌트 카드 */
+#overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5,8,12,0.72); }
+#overlay.hint { align-items: flex-end; padding-bottom: calc(var(--tab-h) + 16px + var(--sa-b)); background: rgba(5,8,12,0.35); }
+.ov-card { width: min(360px, 100%); background: var(--bg2); border: 1px solid var(--accent); border-radius: 14px; padding: 20px 18px 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.ov-card h2 { margin: 0 0 6px; font-size: 22px; color: var(--accent); }
+#overlay.hint .ov-card h2 { font-size: 17px; }
+.ov-card p { margin: 0 0 12px; color: var(--fg); line-height: 1.5; font-size: 14px; }
+#ov-stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0 0 14px; font-size: 14px; }
+#ov-stats:empty { display: none; }
+#ov-stats dt { color: var(--muted); }
+#ov-stats dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+#ov-buttons { display: flex; flex-direction: column; gap: 8px; }
+#ov-buttons .btn { width: 100%; min-height: 48px; font-size: 16px; }
+#overlay.hint #ov-buttons { flex-direction: row; }
+#overlay.hint #ov-buttons .btn { min-height: 44px; font-size: 14px; }

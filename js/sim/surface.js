@@ -220,6 +220,7 @@ function giveRewards(state, reward) {
 
 function resolveExplore(state, exp, tile, rng) {
   tile.revealed = true;
+  state.stats.explored++;
   const def = TILES[tile.type];
   if (def.reward) {
     const got = giveRewards(state, def.reward);

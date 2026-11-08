@@ -1,14 +1,17 @@
 // 브라우저 확인: M3 벙커를 실제로 탭·길게 눌러 끌기로 조작해 본다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serve, loadPlaywright, nextFrame, collectErrors, sleep } from './helpers/server.js';
+import { CONFIG } from '../js/config.js';
+import { serve, loadPlaywright, nextFrame, collectErrors, sleep, skipHints } from './helpers/server.js';
 
 const playwright = loadPlaywright();
+const GEN = CONFIG.BUNKER.ROOMS.generator.perWorker;
 
 test('브라우저: 벙커 — 굴착·건설 3단계·배치·전력·끊김·굶주림·길게 눌러 옮기기', { skip: !playwright && 'playwright 없음', timeout: 120000 }, async () => {
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await skipHints(ctx);
   const page = await ctx.newPage();
   const errors = collectErrors(page);
   const st = (fn, arg) => page.evaluate(fn, arg);
@@ -38,7 +41,7 @@ test('브라우저: 벙커 — 굴착·건설 3단계·배치·전력·끊김·�
     await page.click('[data-action="addWorker"]');
     await page.locator('[data-action="assign"]').nth(0).click();
     await nextFrame(page);
-    assert.equal(await bar('power'), '6/3', '근무자 1명 → 전력 +6');
+    assert.equal(await bar('power'), `${GEN}/3`, '근무자 1명 → 전력 +GEN');
     assert.ok((await body()).includes('근무 1/2'));
     // 빼기 → 0, 다시 넣기
     await page.click('[data-action="unassign"]');

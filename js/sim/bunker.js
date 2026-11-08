@@ -8,6 +8,7 @@ import { pushLog, pushEvent } from './log.js';
 import { spend, missingCost } from './resources.js';
 import { isAvailable, findSurvivor, setRest, workEfficiency } from './survivors.js';
 import { recomputeGrid, shaftReachesFloor, workerMap } from './economy.js';
+import { isUnderAttack } from './raid.js';
 
 const B = CONFIG.BUNKER;
 const ROOMS = B.ROOMS;
@@ -219,6 +220,7 @@ export function startBuild(state, type, floor, col) {
 
 export function assignBuilder(state, survivorId, projectId) {
   if (!projectById(state, projectId)) return fail('reason.notTarget');
+  if (isUnderAttack(state, projectId)) return fail('reason.underAttack');
   if (buildersOf(state, projectId).length >= B.MAX_BUILDERS) return fail('reason.full');
   const s = findSurvivor(state, survivorId);
   if (!s || !isAvailable(s)) return fail('reason.unavailable');
@@ -234,6 +236,7 @@ export function assignWorker(state, survivorId, roomId) {
   const def = ROOMS[r.type];
   if (!def.workers) return fail('reason.noWork');
   if (workersOf(state, roomId).length >= def.workers) return fail('reason.full');
+  if (isUnderAttack(state, roomId)) return fail('reason.underAttack');
   const s = findSurvivor(state, survivorId);
   if (!s || !isAvailable(s)) return fail('reason.unavailable');
   s.job = 'room';
@@ -384,6 +387,7 @@ function stepProjects(state) {
       pushEvent(state, 'toast.repaired', { room: r.type });
     } else {
       r.done = true;
+      state.stats.built++;
       pushLog(state, 'log.built', { floor: r.floor, room: r.type });
       pushEvent(state, 'toast.built', { room: r.type });
       if (!ROOMS[r.type].attach) pushEvent(state, 'fx.built', { floor: r.floor, col: r.col, w: r.w });

@@ -36,6 +36,9 @@ export function createState(seed) {
     door: createDoor(),
     items: {},       // 보관 중인 제작품 (무기 등)
     raid: createRaid(),
+    outcome: null,         // null | 'victory' | 'defeat'
+    afterVictory: false,   // 클리어 뒤 계속 둘러보기
+    stats: { killed: 0, explored: 0, built: 0 },
     log: [],         // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
     events: [],      // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
   };
@@ -114,6 +117,10 @@ export function migrate(raw) {
       bunker: { ...s.bunker, rooms: s.bunker.rooms.map((r) => ({ repairing: false, damage: 0, ...r })) },
     };
   }
+  if (s.version === 4) {
+    // v4(M4) → v5(M5): 결과·통계
+    s = { ...s, version: 5, outcome: null, afterVictory: false, stats: { killed: 0, explored: 0, built: 0 } };
+  }
   if (s.version !== CONFIG.SAVE.VERSION) return null;
   return s;
 }
@@ -132,6 +139,7 @@ function isValidState(s) {
     Array.isArray(s.bunker.cells) && s.bunker.cells.length === s.bunker.cols * s.bunker.floors &&
     s.door && Number.isFinite(s.door.hp) &&
     s.raid && Array.isArray(s.raid.zombies) &&
+    s.stats && typeof s.stats === 'object' &&
     T.SPEEDS.includes(s.speed) &&
     typeof s.paused === 'boolean'
   );

@@ -38,3 +38,10 @@ export function collectErrors(page) {
   page.on('requestfailed', (r) => errors.push('requestfailed: ' + r.url()));
   return errors;
 }
+
+/** 튜토리얼 힌트를 이미 본 것으로 (힌트 카드가 다른 테스트를 가리지 않게) */
+export async function skipHints(ctx) {
+  await ctx.addInitScript(() => {
+    try { localStorage.setItem('dusthold.hints.v1', JSON.stringify(['start', 'surface', 'bunker', 'raid', 'goal'])); } catch {}
+  });
+}

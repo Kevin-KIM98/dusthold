@@ -3,14 +3,18 @@
 import { CONFIG } from './config.js';
 import { t } from './strings.js';
 import { createState, serialize, deserialize } from './sim/state.js';
-import { advance, tick, setSpeed, togglePaused, setPaused } from './sim/time.js';
+import { advance, tick, setSpeed, togglePaused, setPaused, getDay, isFinished } from './sim/time.js';
+import { createWorstState, occupiedCells } from './sim/worst.js';
 import { startExpedition, assignGatherer, unassign } from './sim/surface.js';
 import {
   startDig, startBuild, assignBuilder, assignWorker, unassignBunker, moveSurvivor, startCraft,
   roomAt, digAt, projectById, startTurret, startRepair,
 } from './sim/bunker.js';
 import { upgradeDoor } from './sim/raid.js';
-import { initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas, armNewGameConfirm, isNewGameArmed } from './render/ui.js';
+import {
+  initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas,
+  armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay,
+} from './render/ui.js';
 import { createSurfaceView } from './render/surfaceView.js';
 import { createBunkerView } from './render/bunkerView.js';
 import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText } from './render/viewModel.js';
@@ -33,7 +37,76 @@ const app = {
   selected: -1,     // 선택한 지상 타일 번호 (-1 = 없음)
   bsel: null,       // 선택한 벙커 칸 { kind: 'cell', floor, col } | { kind: 'door' } | null
   picker: null,     // 지상: { mode, tile, chosen: [] } / 벙커: { mode: 'builder'|'worker', target }
+  worst: false,     // F9 최악 장면 중 (저장 안 함)
+  worstBackup: null,
+  hintQueue: [],
+  hintPausedBefore: false,
 };
+
+// ---------- 튜토리얼 힌트 (기기별로 한 번씩) ----------
+const HINTS = ['start', 'surface', 'bunker', 'raid', 'goal'];
+
+function hintsSeen() {
+  try { return new Set(JSON.parse(localStorage.getItem(CONFIG.SAVE.HINTS_KEY) || '[]')); } catch { return new Set(); }
+}
+
+function markHint(ids) {
+  const seen = hintsSeen();
+  for (const id of ids) seen.add(id);
+  try { localStorage.setItem(CONFIG.SAVE.HINTS_KEY, JSON.stringify([...seen])); } catch {}
+}
+
+function queueHint(id) {
+  if (app.worst || !app.state || hintsSeen().has(id) || app.hintQueue.includes(id)) return;
+  app.hintQueue.push(id);
+  showNextHint();
+}
+
+function showNextHint() {
+  if (isOverlayOpen() || app.hintQueue.length === 0) return;
+  const id = app.hintQueue[0];
+  app.hintPausedBefore = app.state.paused;
+  setPaused(app.state, true);
+  showOverlay({
+    variant: 'hint',
+    title: t('hint.' + id + '.title'),
+    sub: t('hint.' + id + '.body'),
+    buttons: [{ id: 'next', label: t('hint.next'), primary: true }, { id: 'off', label: t('hint.off') }],
+  }, (btn) => {
+    app.hintQueue.shift();
+    if (btn === 'off') { markHint(HINTS); app.hintQueue.length = 0; } else markHint([id]);
+    hideOverlay();
+    setPaused(app.state, app.hintPausedBefore);
+    if (id === 'start') queueHint('surface');
+    showNextHint();
+  });
+}
+
+// ---------- 결과 화면 ----------
+function showOutcome(kind) {
+  const st = app.state;
+  hideOverlay();
+  app.hintQueue.length = 0;
+  const stats = [
+    [t('over.stat.day'), t('over.stat.dayValue', { day: getDay(st) })],
+    [t('over.stat.survivors'), String(st.survivors.length)],
+    [t('over.stat.killed'), String(st.stats.killed)],
+    [t('over.stat.explored'), String(st.stats.explored)],
+    [t('over.stat.built'), String(st.stats.built)],
+  ];
+  const buttons = [{ id: 'new', label: t('over.new'), primary: true }];
+  if (kind === 'victory') buttons.push({ id: 'continue', label: t('over.continue') });
+  showOverlay({ variant: 'result', title: t('over.' + kind + '.title'), sub: t('over.' + kind + '.sub'), stats, buttons }, (btn) => {
+    hideOverlay();
+    if (btn === 'new') {
+      clearSave();
+      startGame(createState(newSeed()), { fresh: true });
+    } else if (btn === 'continue') {
+      st.afterVictory = true;
+      saveNow();
+    }
+  });
+}
 
 // ---------- 저장 ----------
 function readSave() {
@@ -48,7 +121,7 @@ function readSave() {
 }
 
 function saveNow() {
-  if (!app.state) return false;
+  if (!app.state || app.worst) return false;
   try {
     localStorage.setItem(CONFIG.SAVE.KEY, serialize(app.state));
     app.sinceSaveSec = 0;
@@ -67,7 +140,9 @@ function newSeed() {
   return Date.now() >>> 0;
 }
 
-function startGame(state) {
+function startGame(state, opts = {}) {
+  hideOverlay();
+  app.hintQueue.length = 0;
   app.state = state;
   app.sinceSaveSec = 0;
   app.selected = -1;
@@ -84,6 +159,8 @@ function startGame(state) {
     app.lastTs = performance.now();
     requestAnimationFrame(frame);
   }
+  if (opts.fresh) queueHint('start');
+  if (state.outcome && isFinished(state)) showOutcome(state.outcome);
 }
 
 function onNewGame() {
@@ -93,7 +170,7 @@ function onNewGame() {
     return;
   }
   clearSave();
-  startGame(createState(newSeed()));
+  startGame(createState(newSeed()), { fresh: true });
 }
 
 function onContinue() {
@@ -104,7 +181,7 @@ function onContinue() {
   } else {
     showToast(t('toast.saveBroken'));
     clearSave();
-    startGame(createState(newSeed()));
+    startGame(createState(newSeed()), { fresh: true });
   }
 }
 
@@ -114,6 +191,7 @@ function changeView(view) {
   app.picker = null;
   setView(view);
   if (view !== 'log') resizeCanvas();
+  if (view === 'bunker') queueHint('bunker');
 }
 
 function resizeCanvas() {
@@ -138,8 +216,7 @@ function resizeCanvas() {
 
 function draw(now) {
   if (app.view === 'log' || app.cssW === 0) return;
-  const ctx = app.ctx;
-  ctx.clearRect(0, 0, app.cssW, app.cssH);
+  const ctx = app.ctx; // 두 화면 모두 캔버스 전체를 칠하므로 따로 지우지 않는다
   if (app.view === 'surface') app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now });
   else app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, paused: app.state.paused });
 }
@@ -149,7 +226,12 @@ function drainEvents() {
   if (ev.length === 0) return;
   for (const e of ev) {
     if (e.key.startsWith('fx.')) app.bunkerView.onEvent(e);
-    else showToast(formatMessage(e.key, e.params));
+    else if (e.key.startsWith('outcome.')) showOutcome(e.key.slice('outcome.'.length));
+    else {
+      showToast(formatMessage(e.key, e.params));
+      if (e.key === 'toast.raidWarning') queueHint('raid');
+      if (e.key === 'toast.newDay') queueHint('goal');
+    }
   }
   ev.length = 0;
 }
@@ -292,7 +374,13 @@ function frame(ts) {
     const inst = 1 / dt;
     app.fps = app.fps === 0 ? inst : app.fps + (inst - app.fps) * CONFIG.UI.FPS_SMOOTHING;
   }
-  if (app.debug) setDebug(true, t('debug.fps', { fps: Math.round(app.fps), tick: app.state.time.tick }));
+  if (app.worst) {
+    // 파티클을 항상 최대(150개)로 채워 둔다
+    const fx = app.bunkerView.fx;
+    const need = CONFIG.FX.MAX_PARTICLES - fx.count();
+    if (need > 0) fx.sparkle(0, 0, CONFIG.BUNKER_VIEW.SIDE * 2 + CONFIG.BUNKER.COLS * CONFIG.BUNKER_VIEW.CELL_W, CONFIG.BUNKER_VIEW.SKY_H + CONFIG.BUNKER.MAX_FLOORS * CONFIG.BUNKER_VIEW.CELL_H, need);
+    setDebug(true, t('debug.worst', { fps: Math.round(app.fps), z: app.state.raid.zombies.length, p: fx.count(), cells: occupiedCells(app.state) }));
+  } else if (app.debug) setDebug(true, t('debug.fps', { fps: Math.round(app.fps), tick: app.state.time.tick }));
 
   draw(ts);
   renderUI(app.state);
@@ -310,12 +398,37 @@ const handlers = {
   onToggleView() { if (app.state) changeView(app.view === 'surface' ? 'bunker' : 'surface'); },
   onClose() { app.picker = null; app.selected = -1; app.bsel = null; closePanel(); },
   onPanelAction,
-  onDebug() { app.debug = !app.debug; setDebug(app.debug, ''); },
+  onDebug() { toggleWorst(); },
 };
+
+// ---------- F9 최악 장면 (성능 측정) ----------
+function toggleWorst() {
+  if (!app.worst) {
+    if (!app.state) return enterWorst();
+    app.worstBackup = app.state;
+    enterWorst();
+  } else {
+    app.worst = false;
+    app.debug = false;
+    setDebug(false, '');
+    const back = app.worstBackup;
+    app.worstBackup = null;
+    if (back) startGame(back); else showTitle(readSave().exists);
+  }
+}
+
+function enterWorst() {
+  const st = createWorstState();
+  app.worst = true;
+  startGame(st);
+  setSpeed(st, CONFIG.TIME.SPEEDS[CONFIG.TIME.SPEEDS.length - 1]);
+  setDebug(true, '');
+}
 
 // ---------- 부트 ----------
 function boot() {
   initUI(handlers);
+  initOverlay();
   initInput(handlers);
   app.canvas = getCanvas();
   app.ctx = app.canvas.getContext('2d');
@@ -341,6 +454,8 @@ function boot() {
     onDragCancel() { bunkerDrag.cancel(); },
   });
 
+  // 모바일: 길게 누를 때 뜨는 메뉴 막기
+  app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('resize', resizeCanvas);
   // 패널 펼침 등으로 무대 크기가 바뀌면 캔버스도 다시 맞춘다
   if (typeof ResizeObserver !== 'undefined') {
@@ -351,6 +466,8 @@ function boot() {
 
   const { exists } = readSave();
   showTitle(exists);
+  // 폰에서 성능 확인: index.html?worst
+  if (new URLSearchParams(location.search).has(CONFIG.WORST.URL_PARAM)) enterWorst();
 
   // 디버그·테스트용 손잡이 (F9, 브라우저 테스트)
   window.DUSTHOLD = {
@@ -368,6 +485,10 @@ function boot() {
     get camera() { return app.surfaceView && app.surfaceView.camera; },
     get bunkerCamera() { return app.bunkerView && app.bunkerView.camera; },
     get particles() { return app.bunkerView ? app.bunkerView.fx.count() : 0; },
+    get worst() { return app.worst; },
+    get fps() { return app.fps; },
+    toggleWorst,
+    occupiedCells: () => occupiedCells(app.state),
     projectById: (id) => projectById(app.state, id),
     /** 지상 타일 중심의 페이지 좌표 (테스트에서 탭 위치 계산용) */
     tileToPage(i) {
