@@ -7,8 +7,9 @@ import { advance, tick, setSpeed, togglePaused, setPaused } from './sim/time.js'
 import { startExpedition, assignGatherer, unassign } from './sim/surface.js';
 import {
   startDig, startBuild, assignBuilder, assignWorker, unassignBunker, moveSurvivor, startCraft,
-  roomAt, digAt, projectById,
+  roomAt, digAt, projectById, startTurret, startRepair,
 } from './sim/bunker.js';
+import { upgradeDoor } from './sim/raid.js';
 import { initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas, armNewGameConfirm, isNewGameArmed } from './render/ui.js';
 import { createSurfaceView } from './render/surfaceView.js';
 import { createBunkerView } from './render/bunkerView.js';
@@ -139,7 +140,7 @@ function draw(now) {
   if (app.view === 'log' || app.cssW === 0) return;
   const ctx = app.ctx;
   ctx.clearRect(0, 0, app.cssW, app.cssH);
-  if (app.view === 'surface') app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected });
+  if (app.view === 'surface') app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now });
   else app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, paused: app.state.paused });
 }
 
@@ -199,22 +200,34 @@ function onSurfaceAction(action, arg) {
 function onBunkerAction(action, arg) {
   const st = app.state;
   const sel = app.bsel;
-  if (!sel || sel.kind !== 'cell') return;
+  if (!sel) return;
+  if (action === 'upgradeDoor') { toastFail(upgradeDoor(st)); return; }
+  if (action === 'turret') {
+    const r = startTurret(st);
+    if (toastFail(r)) app.picker = { mode: 'builder', target: r.id };
+    return;
+  }
+  if (action === 'repair') {
+    const r = startRepair(st, arg);
+    if (toastFail(r)) app.picker = { mode: 'builder', target: r.id };
+    return;
+  }
+  if (action === 'addBuilder') { app.picker = { mode: 'builder', target: arg }; return; }
+  if (action === 'assign' && app.picker) {
+    const r = app.picker.mode === 'builder' ? assignBuilder(st, arg, app.picker.target) : assignWorker(st, arg, app.picker.target);
+    if (toastFail(r)) app.picker = null;
+    return;
+  }
+  if (action === 'unassign') { unassignBunker(st, arg); return; }
+  if (sel.kind !== 'cell') return;
   if (action === 'dig') {
     const r = startDig(st, sel.floor, sel.col);
     if (toastFail(r)) app.picker = { mode: 'builder', target: r.id };
   } else if (action === 'build') {
     const r = startBuild(st, arg, sel.floor, sel.col);
     if (toastFail(r)) app.picker = { mode: 'builder', target: r.id };
-  } else if (action === 'addBuilder') {
-    app.picker = { mode: 'builder', target: arg };
   } else if (action === 'addWorker') {
     app.picker = { mode: 'worker', target: arg };
-  } else if (action === 'assign' && app.picker) {
-    const r = app.picker.mode === 'builder' ? assignBuilder(st, arg, app.picker.target) : assignWorker(st, arg, app.picker.target);
-    if (toastFail(r)) app.picker = null;
-  } else if (action === 'unassign') {
-    unassignBunker(st, arg);
   } else if (action === 'craft') {
     const room = roomAt(st, sel.floor, sel.col);
     if (room) toastFail(startCraft(st, room.id, arg));
@@ -365,6 +378,12 @@ function boot() {
     /** 벙커 칸 중심의 페이지 좌표 */
     cellToPage(floor, col) {
       const p = app.bunkerView.cellToScreen(floor, col, app.cssW, app.cssH);
+      const r = app.canvas.getBoundingClientRect();
+      return { x: r.left + p.x, y: r.top + p.y };
+    },
+    /** 방폭문 중심의 페이지 좌표 */
+    doorToPage() {
+      const p = app.bunkerView.doorToScreen(app.cssW, app.cssH);
       const r = app.canvas.getBoundingClientRect();
       return { x: r.left + p.x, y: r.top + p.y };
     },

@@ -4,7 +4,9 @@
 
 import { CONFIG } from '../config.js';
 import { isNight } from '../sim/clock.js';
-import { canExplore, centerIndex, tileXY, isDepleted, gatherersAt } from '../sim/surface.js';
+import { canExplore, centerIndex, tileXY, isDepleted } from '../sim/surface.js';
+import { zombiePos } from '../sim/raid.js';
+import { drawZombie } from './zombieArt.js';
 
 const C = CONFIG.CAMERA;
 const PAL = {
@@ -174,6 +176,26 @@ export function createSurfaceView() {
     if (isNight(state)) {
       ctx.fillStyle = PAL.night;
       ctx.fillRect(0, 0, w, h);
+    }
+
+    // 좀비 (밤 어둠 위에 그려서 잘 보이게)
+    const raid = state.raid;
+    if (raid && raid.active) {
+      const now = (ui && ui.now) || 0;
+      const k = Math.max(0.5, tp / C.TILE_PX);
+      for (const z of raid.zombies) {
+        if (z.phase === 'inside') continue;
+        let p = zombiePos(z);
+        if (z.phase === 'door') {
+          // 입구 둘레에 모여 문을 두드린다
+          const a = (z.id * 2.399) % (Math.PI * 2);
+          const r = 0.42 + (z.id % 3) * 0.08;
+          p = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r };
+        }
+        const sp = view.worldToScreen(p.x, p.y, w, h);
+        const face = p.x <= n / 2 ? 1 : -1;
+        drawZombie(ctx, sp.x, sp.y + 8 * k, k, z.type, face, now + z.id * 97, z.hp / z.maxHp);
+      }
     }
   };
 

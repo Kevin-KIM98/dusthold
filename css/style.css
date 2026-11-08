@@ -107,7 +107,7 @@ body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
 .tab { min-height: var(--tab-h); border: 0; background: none; font-size: 15px; cursor: pointer; border-radius: 0; }
 
 /* 토스트 */
-#toasts { position: fixed; left: 0; right: 0; top: calc(112px + var(--sa-t)); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 20; }
+#toasts { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 20; }
 .toast { background: rgba(20,24,28,0.92); border: 1px solid var(--accent); color: var(--fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; animation: toast-in .2s ease-out; }
 .toast.out { opacity: 0; transition: opacity .3s; }
 @keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }

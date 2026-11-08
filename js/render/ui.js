@@ -289,6 +289,7 @@ export function showToast(text) {
   div.className = 'toast';
   div.textContent = text;
   el.toasts.appendChild(div);
+  while (el.toasts.children.length > CONFIG.UI.TOAST_MAX) el.toasts.firstChild.remove();
   setTimeout(() => div.classList.add('out'), (CONFIG.UI.TOAST_SEC - 0.3) * 1000);
   setTimeout(() => div.remove(), CONFIG.UI.TOAST_SEC * 1000);
 }

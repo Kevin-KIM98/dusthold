@@ -5,8 +5,10 @@
 import { CONFIG } from '../config.js';
 import { t } from '../strings.js';
 import { isNight } from '../sim/clock.js';
-import { getBuildStage, buildersOf, workersOf, roomDef, isDug } from '../sim/bunker.js';
+import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets } from '../sim/bunker.js';
+import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
+import { drawZombie } from './zombieArt.js';
 
 const V = CONFIG.BUNKER_VIEW;
 const BK = CONFIG.BUNKER;
@@ -191,7 +193,8 @@ export function createBunkerView() {
     drawCables(ctx, state, S, zz);
 
     view.figures = [];
-    for (const r of state.bunker.rooms) drawRoom(ctx, state, r, S, zz, now, view);
+    for (const r of state.bunker.rooms) if (!roomDef(r.type).attach) drawRoom(ctx, state, r, S, zz, now, view);
+    drawRaid(ctx, state, S, zz, now, ws);
     for (const d of state.bunker.digs) drawDig(ctx, state, d, S, zz, now, view, dt, ui.paused);
 
     view.fx.update(dt);
@@ -259,6 +262,8 @@ function drawSurface(ctx, state, S, zz, now) {
   ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz, 4 * zz);
   ctx.fillStyle = ratio > 0.5 ? '#6abf4b' : ratio > 0.25 ? '#e0a030' : '#e0504a';
   ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz * ratio, 4 * zz);
+  // 자동 포탑 (문 양옆)
+  for (const tu of turrets(state)) drawTurret(ctx, state, tu, S, zz, now);
   // 대기 중인 생존자
   for (let k = 0; k < Math.min(state.waiting.length, 4); k++) {
     drawPerson(ctx, p.x - (12 + k * 12) * zz, p.y + d.h * zz, zz * 0.9, state.waiting[k], 0);
@@ -294,7 +299,7 @@ function drawSurface(ctx, state, S, zz, now) {
 // ---------- 전선: 샤프트 세로줄 + 층마다 천장을 따라 ----------
 function drawCables(ctx, state, S, zz) {
   const rows = new Map();
-  for (const r of state.bunker.rooms) if (r.connected) {
+  for (const r of state.bunker.rooms) if (r.connected && !roomDef(r.type).attach) {
     if (!rows.has(r.floor)) rows.set(r.floor, []);
     rows.get(r.floor).push(r);
   }
@@ -366,10 +371,30 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
     drawPerson(ctx, fx, fy, zz, s, r.on ? Math.sin(now / 300 + k) * 0.5 : 0);
     view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
   });
-  // 제작 진행
+  // 제작·수리 진행
   if (r.craft) drawBar(ctx, x, y, w, h, zz, r.craft.progress);
-  // 꺼짐 / 끊김
-  if (!r.on && r.type !== 'shaft') {
+  if (r.repairing) {
+    drawScaffold(ctx, x, y, w, h, zz, 0.6);
+    drawBar(ctx, x, y, w, h, zz, r.progress);
+    buildersOf(state, r.id).forEach((s, k) => {
+      const fx = x + (0.3 + 0.4 * ((Math.sin(now / 500 + k * 2) + 1) / 2)) * w;
+      const fy = y + h - 10 * zz;
+      drawPerson(ctx, fx, fy, zz, s, Math.sin(now / 120 + k));
+      view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
+    });
+  }
+  // 고장 / 꺼짐 / 끊김
+  if (r.broken) {
+    ctx.fillStyle = PAL.off;
+    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
+    drawCracks(ctx, x, y, w, h, zz);
+  } else if (r.damage > 0) {
+    ctx.fillStyle = `rgba(200,40,30,${0.15 + 0.35 * r.damage / CONFIG.RAID_RULES.ROOM_BREAK_HP})`;
+    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
+  }
+  if (r.broken) {
+    // 고장 표시가 우선
+  } else if (!r.on && r.type !== 'shaft') {
     ctx.fillStyle = PAL.off;
     ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
     drawBolt(ctx, x + w - 14 * zz, y + 16 * zz, 9 * zz, r.connected ? PAL.bolt : PAL.boltOff, !r.connected);
@@ -410,6 +435,100 @@ function drawDig(ctx, state, d, S, zz, now, view, dt, paused) {
     const wx = rr.x + (fromLeft ? rr.w * d.progress : rr.w * (1 - d.progress));
     view.fx.emitDirt(wx, rr.y + rr.h * 0.4, rr.h * 0.5, n);
   }
+}
+
+// ---------- 습격 ----------
+function drawRaid(ctx, state, S, zz, now, ws) {
+  const raid = state.raid;
+  if (!raid || !raid.active) return;
+  const d = doorRect();
+  const groundY = V.SKY_H - V.GRASS_H;
+  const leftSide = (z) => (raid.side === 3 ? true : raid.side === 1 ? false : z.id % 2 === 0);
+  // 지표면: 다가오는 좀비 + 문 앞 좀비
+  for (const z of raid.zombies) {
+    if (z.phase === 'inside') continue;
+    const left = leftSide(z);
+    let wx;
+    if (z.phase === 'approach') {
+      const k = Math.min(1, z.t / z.arrive);
+      const startX = left ? -10 : ws.w + 10;
+      const endX = left ? d.x - 8 : d.x + d.w + 8;
+      wx = startX + (endX - startX) * k;
+    } else {
+      const slot = (z.order % 6) * 7;
+      wx = left ? d.x - 6 - slot : d.x + d.w + 6 + slot;
+    }
+    const p = S(wx, groundY);
+    const lunge = z.phase === 'door' ? Math.max(0, Math.sin(now / 160 + z.id)) * 3 * zz * (left ? 1 : -1) : 0;
+    drawZombie(ctx, p.x + lunge, p.y, zz, z.type, left ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
+  }
+  // 문을 두드리는 충격
+  if (!raid.breached && raid.zombies.some((z) => z.phase === 'door') && Math.sin(now / 90) > 0.6) {
+    const p = S(d.x, d.y);
+    ctx.strokeStyle = 'rgba(255,200,120,0.8)';
+    ctx.lineWidth = 2 * zz;
+    ctx.strokeRect(p.x - 2 * zz, p.y - 2 * zz, (d.w + 4) * zz, (d.h + 4) * zz);
+  }
+  // 침입: 1층에서 방을 부수는 중
+  const inside = raid.zombies.filter((z) => z.phase === 'inside');
+  if (inside.length > 0) {
+    const target = intrusionTarget(state);
+    const r0 = target ? cellRect(1, target.col) : cellRect(1, BK.SHAFT_COL);
+    const width = target ? r0.w * target.w : r0.w;
+    inside.slice(0, 12).forEach((z, k) => {
+      const p = S(r0.x + ((k + 0.5) / Math.min(12, inside.length)) * width, r0.y + r0.h - 6);
+      drawZombie(ctx, p.x, p.y, zz * 0.85, z.type, k % 2 ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
+    });
+  }
+}
+
+function drawTurret(ctx, state, tu, S, zz, now) {
+  const d = doorRect();
+  const left = tu.col === 0;
+  const bx = left ? d.x - 16 : d.x + d.w + 4;
+  const p = S(bx, d.y + d.h - 14);
+  const k = zz;
+  if (!tu.done) {
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = PAL.scaffold;
+    ctx.lineWidth = 1.5 * k;
+    ctx.strokeRect(p.x, p.y - 6 * k, 12 * k, 20 * k);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = PAL.barBg;
+    ctx.fillRect(p.x, p.y + 16 * k, 12 * k, 3 * k);
+    ctx.fillStyle = PAL.bar;
+    ctx.fillRect(p.x, p.y + 16 * k, 12 * k * tu.progress, 3 * k);
+    return;
+  }
+  ctx.fillStyle = '#5a5f64';
+  ctx.fillRect(p.x, p.y + 4 * k, 12 * k, 10 * k);
+  ctx.fillStyle = tu.on ? '#8a9096' : '#4a4e52';
+  ctx.beginPath(); ctx.arc(p.x + 6 * k, p.y + 4 * k, 6 * k, Math.PI, 0); ctx.fill();
+  const dir = left ? -1 : 1;
+  ctx.fillRect(p.x + 6 * k + (dir < 0 ? -12 * k : 0), p.y + 1 * k, 12 * k, 3 * k);
+  const raid = state.raid;
+  const firing = tu.on && raid && raid.active && raid.zombies.some((z) => z.phase !== 'approach');
+  if (firing && Math.sin(now / 50 + tu.id) > 0.3) {
+    ctx.fillStyle = '#ffe680';
+    ctx.beginPath(); ctx.arc(p.x + 6 * k + dir * 14 * k, p.y + 2.5 * k, 3 * k, 0, Math.PI * 2); ctx.fill();
+  }
+  if (!tu.on) drawBolt(ctx, p.x + 6 * k, p.y - 6 * k, 5 * k, tu.connected ? PAL.bolt : PAL.boltOff, !tu.connected);
+}
+
+function drawCracks(ctx, x, y, w, h, zz) {
+  ctx.strokeStyle = '#d0504a';
+  ctx.lineWidth = 2 * zz;
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.3, y + 6 * zz); ctx.lineTo(x + w * 0.4, y + h * 0.4); ctx.lineTo(x + w * 0.32, y + h * 0.6); ctx.lineTo(x + w * 0.45, y + h - 8 * zz);
+  ctx.moveTo(x + w * 0.4, y + h * 0.4); ctx.lineTo(x + w * 0.6, y + h * 0.45); ctx.lineTo(x + w * 0.7, y + h * 0.3);
+  ctx.stroke();
+  // 렌치 대신 느낌표 삼각형 (고장 표시)
+  const cx = x + w - 14 * zz, cy = y + 16 * zz;
+  ctx.fillStyle = '#e0a030';
+  ctx.beginPath(); ctx.moveTo(cx, cy - 8 * zz); ctx.lineTo(cx + 8 * zz, cy + 6 * zz); ctx.lineTo(cx - 8 * zz, cy + 6 * zz); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#1a1714';
+  ctx.fillRect(cx - 1 * zz, cy - 3 * zz, 2 * zz, 5 * zz);
+  ctx.fillRect(cx - 1 * zz, cy + 3 * zz, 2 * zz, 1.5 * zz);
 }
 
 // ---------- 조각 그림 ----------

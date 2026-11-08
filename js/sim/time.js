@@ -5,7 +5,7 @@ import { pushLog, pushEvent } from './log.js';
 import { DAY_TICKS, DAYLIGHT_TICKS, RAID_WARNING_TICKS, getDay } from './clock.js';
 import { step as surfaceStep, onNightStart as surfaceNight } from './surface.js';
 import { step as bunkerStep } from './bunker.js';
-import { step as raidStep } from './raid.js';
+import { step as raidStep, onNightStart as raidNight, onDawn as raidDawn } from './raid.js';
 import { step as economyStep, onDawn as economyDawn, onNightStart as economyNight } from './economy.js';
 
 export * from './clock.js';
@@ -20,6 +20,7 @@ export function tick(state) {
   const day = getDay(state);
 
   if (inDay === 0) {
+    raidDawn(state);
     economyDawn(state);
     pushLog(state, 'log.newDay', { day });
     pushEvent(state, 'toast.newDay', { day });
@@ -28,6 +29,7 @@ export function tick(state) {
     pushEvent(state, 'toast.nightFalls', { day });
     surfaceNight(state);
     economyNight(state);
+    raidNight(state, day);
   } else if (inDay === DAYLIGHT_TICKS - RAID_WARNING_TICKS) {
     pushLog(state, 'log.raidWarning', { sec: T.RAID_WARNING_SEC });
     pushEvent(state, 'toast.raidWarning', { sec: T.RAID_WARNING_SEC });

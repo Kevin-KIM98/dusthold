@@ -49,7 +49,8 @@ test('기록은 최신이 먼저, 한국어 문자열로 바뀐다', () => {
   const s = createState(1);
   for (let i = 0; i < 1800; i++) tick(s);
   const rows = logModel(s);
-  assert.equal(rows[0].text, t('log.nightFalls'));
+  assert.match(rows[0].text, /^좀비 \d+마리가 몰려온다$/, '가장 최근: 습격 시작');
+  assert.equal(rows[1].text, t('log.nightFalls'));
   assert.equal(rows[rows.length - 1].text, '벙커에 도착했다. 생존자 4명.');
   assert.equal(rows[0].dayText, '1일차');
 });

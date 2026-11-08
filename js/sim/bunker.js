@@ -28,7 +28,10 @@ export function createBunker() {
 }
 
 function newRoom(bk, type, floor, col, done) {
-  return { id: bk.nextId++, type, floor, col, w: ROOMS[type].w, done, progress: done ? 1 : 0, acc: 0, on: false, connected: false, broken: false, craft: null };
+  return {
+    id: bk.nextId++, type, floor, col, w: ROOMS[type].w, done, progress: done ? 1 : 0, acc: 0,
+    on: false, connected: false, broken: false, repairing: false, damage: 0, craft: null,
+  };
 }
 
 export function createDoor() {
@@ -49,8 +52,13 @@ export function isDug(state, floor, col) {
   return inBounds(bk, floor, col) && bk.cells[cellIndex(bk, floor, col)].dug;
 }
 
+/** 단면도 칸의 방 (방폭문에 붙은 포탑은 칸이 없으므로 제외) */
 export function roomAt(state, floor, col) {
-  return state.bunker.rooms.find((r) => r.floor === floor && col >= r.col && col < r.col + r.w) || null;
+  return state.bunker.rooms.find((r) => !ROOMS[r.type].attach && r.floor === floor && col >= r.col && col < r.col + r.w) || null;
+}
+
+export function turrets(state) {
+  return state.bunker.rooms.filter((r) => r.type === 'turret');
 }
 
 export function digAt(state, floor, col) {
@@ -61,12 +69,13 @@ export function roomById(state, id) {
   return state.bunker.rooms.find((r) => r.id === id) || null;
 }
 
-/** 진행 중인 공사(굴착 또는 미완공 방) */
+/** 진행 중인 공사(굴착·미완공 방·수리 중인 방) */
 export function projectById(state, id) {
   const d = state.bunker.digs.find((x) => x.id === id);
   if (d) return { kind: 'dig', ref: d };
   const r = roomById(state, id);
   if (r && !r.done) return { kind: 'room', ref: r };
+  if (r && r.repairing) return { kind: 'repair', ref: r };
   return null;
 }
 
@@ -99,11 +108,14 @@ export function buildTimeMult(builders) {
   if (builders.length === 0) return Infinity;
   let m = builders.length >= 2 ? B.TWO_BUILDERS_MULT : 1;
   if (builders.some((s) => s.specialty === 'build')) m *= B.BUILD_SPECIALTY_MULT;
+  if (builders.some((s) => s.tool)) m /= 1 + B.TOOL_SPEED_BONUS;
   return m;
 }
 
 export function projectSec(project) {
-  return project.kind === 'dig' ? B.DIG.sec : ROOMS[project.ref.type].sec;
+  if (project.kind === 'dig') return B.DIG.sec;
+  if (project.kind === 'repair') return B.REPAIR.sec;
+  return ROOMS[project.ref.type].sec;
 }
 
 /** 남은 초 (인원 없으면 Infinity) */
@@ -169,7 +181,7 @@ function placeOk(state, type, floor, start) {
 
 export function canBuild(state, type, floor, col) {
   const def = ROOMS[type];
-  if (!def) return fail('reason.notTarget');
+  if (!def || def.attach) return fail('reason.notTarget');
   if (!isDug(state, floor, col)) return fail('reason.notDug');
   if (roomAt(state, floor, col) || digAt(state, floor, col)) return fail('reason.full');
   if (type === 'shaft') {
@@ -255,6 +267,49 @@ export function moveSurvivor(state, survivorId, targetId) {
   return r;
 }
 
+// ---------- 자동 포탑 (방폭문에 부착) ----------
+export function canBuildTurret(state) {
+  const def = ROOMS.turret;
+  if (turrets(state).length >= def.max) return fail('reason.turretMax', { max: def.max });
+  return costCheck(state, def.cost);
+}
+
+export function startTurret(state) {
+  const c = canBuildTurret(state);
+  if (!c.ok) return c;
+  spend(state, ROOMS.turret.cost);
+  const room = newRoom(state.bunker, 'turret', 0, turrets(state).length, false);
+  state.bunker.rooms.push(room);
+  pushLog(state, 'log.order', { floor: 0, room: 'turret' });
+  return { ok: true, id: room.id };
+}
+
+// ---------- 고장 난 방 수리 ----------
+/** 수리비: 건설비의 30% (올림). 통신부품은 빼고 */
+export function repairCost(type) {
+  const out = {};
+  const cost = ROOMS[type].cost;
+  for (const k of Object.keys(cost)) if (k !== 'parts') out[k] = Math.ceil(cost[k] * B.REPAIR.costRatio);
+  return out;
+}
+
+export function canRepair(state, roomId) {
+  const r = roomById(state, roomId);
+  if (!r || !r.broken) return fail('reason.notBroken');
+  if (r.repairing) return fail('reason.repairing');
+  return costCheck(state, repairCost(r.type));
+}
+
+export function startRepair(state, roomId) {
+  const c = canRepair(state, roomId);
+  if (!c.ok) return c;
+  const r = roomById(state, roomId);
+  spend(state, repairCost(r.type));
+  r.repairing = true;
+  r.progress = 0;
+  return { ok: true, id: r.id };
+}
+
 // ---------- 제작 (작업장) ----------
 export function canCraft(state, roomId, item) {
   const r = roomById(state, roomId);
@@ -274,20 +329,22 @@ export function startCraft(state, roomId, item) {
   return OK;
 }
 
-/** 무기 완성: 무기 없는 생존자에게 장착 (전투 특기 먼저). 줄 사람이 없으면 보관 */
+// 완성품을 먼저 받을 특기 (나머지는 id 순)
+const CRAFT_FIRST = { weapon: ['combat'], tool: ['build', 'gather'], gear: [] };
+
+/** 완성품: 아직 없는 생존자에게 바로 장착. 줄 사람이 없으면 보관 */
 function finishCraft(state, room) {
   const item = room.craft.item;
   room.craft = null;
-  if (item === 'weapon') {
-    const pool = state.survivors.filter((s) => !s.weapon);
-    pool.sort((a, b) => (b.specialty === 'combat') - (a.specialty === 'combat') || a.id - b.id);
-    if (pool.length > 0) {
-      pool[0].weapon = true;
-      pushLog(state, 'log.crafted', { item, name: pool[0].name });
-    } else {
-      state.items[item] = (state.items[item] || 0) + 1;
-      pushLog(state, 'log.craftedStored', { item });
-    }
+  const first = CRAFT_FIRST[item] || [];
+  const rank = (s) => { const k = first.indexOf(s.specialty); return k < 0 ? first.length : k; };
+  const pool = state.survivors.filter((s) => !s[item]).sort((a, b) => rank(a) - rank(b) || a.id - b.id);
+  if (pool.length > 0) {
+    pool[0][item] = true;
+    pushLog(state, 'log.crafted', { item, name: pool[0].name });
+  } else {
+    state.items[item] = (state.items[item] || 0) + 1;
+    pushLog(state, 'log.craftedStored', { item });
   }
 }
 
@@ -311,20 +368,28 @@ function stepProjects(state) {
     }
   }
   for (const r of bk.rooms) {
-    if (r.done) continue;
+    if (r.done && !r.repairing) continue;
     const m = buildTimeMult(buildersOf(state, r.id));
     if (m === Infinity) continue;
-    r.progress += T.TICK_SEC / (ROOMS[r.type].sec * m);
-    if (r.progress >= 1 - 1e-9) {
-      r.progress = 1;
+    const sec = r.repairing ? B.REPAIR.sec : ROOMS[r.type].sec;
+    r.progress += T.TICK_SEC / (sec * m);
+    if (r.progress < 1 - 1e-9) continue;
+    r.progress = 1;
+    for (const s of buildersOf(state, r.id)) setRest(s);
+    if (r.repairing) {
+      r.repairing = false;
+      r.broken = false;
+      r.damage = 0;
+      pushLog(state, 'log.repaired', { floor: r.floor, room: r.type });
+      pushEvent(state, 'toast.repaired', { room: r.type });
+    } else {
       r.done = true;
-      for (const s of buildersOf(state, r.id)) setRest(s);
       pushLog(state, 'log.built', { floor: r.floor, room: r.type });
       pushEvent(state, 'toast.built', { room: r.type });
-      pushEvent(state, 'fx.built', { floor: r.floor, col: r.col, w: r.w });
-      bk.rev++;
-      changed = true;
+      if (!ROOMS[r.type].attach) pushEvent(state, 'fx.built', { floor: r.floor, col: r.col, w: r.w });
     }
+    bk.rev++;
+    changed = true;
   }
   if (changed) recomputeGrid(state);
 }

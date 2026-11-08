@@ -4,7 +4,7 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 3,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커)
+    VERSION: 4,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
 
@@ -72,14 +72,21 @@ export const CONFIG = Object.freeze({
       guard:     Object.freeze({ w: 1, cost: Object.freeze({ scrap: 20 }), sec: 20, use: 2, workers: 2, dpsPerGuard: 5, specialty: 'combat' }),
       medbay:    Object.freeze({ w: 2, cost: Object.freeze({ wood: 15, scrap: 15 }), sec: 25, use: 3, workers: 1, healPerDay: 40, specialty: 'tech' }),
       radio:     Object.freeze({ w: 2, cost: Object.freeze({ scrap: 80, wood: 40, parts: 1 }), sec: 60, use: 10, workers: 1, specialty: 'tech' }),
+      // 자동 포탑: 방폭문에 붙인다 (단면도 칸을 차지하지 않음). 최대 2기
+      turret:    Object.freeze({ w: 1, cost: Object.freeze({ scrap: 40 }), sec: 25, use: 4, workers: 0, dps: 8, max: 2, attach: 'door' }),
     }),
     BUILD_MENU: Object.freeze(['generator', 'water', 'farm', 'quarters', 'storage', 'workshop', 'guard', 'medbay', 'radio']),
     // 전력 부족 시 앞쪽이 끝까지 켜져 있다 (뒤쪽부터 꺼짐). turret = 자동 포탑 (M4)
     POWER_PRIORITY: Object.freeze(['guard', 'turret', 'water', 'farm', 'medbay', 'workshop', 'quarters', 'radio']),
-    // 작업장 제작. 제작 시간은 기획서에 없어 30초(1명 기준)로 정함. 도구·탐사 장비는 효과가 정해지지 않아 보류.
+    // 작업장 제작. 제작 시간은 기획서에 없어 30초(1명 기준)로 정함. 완성품은 1인 1개씩 자동 장착.
     CRAFTS: Object.freeze({
       weapon: Object.freeze({ cost: Object.freeze({ scrap: 15 }), sec: 30 }),
+      tool: Object.freeze({ cost: Object.freeze({ wood: 10, scrap: 5 }), sec: 30 }),
+      gear: Object.freeze({ cost: Object.freeze({ scrap: 20 }), sec: 30 }),
     }),
+    TOOL_SPEED_BONUS: 0.25,        // 도구: 가진 사람의 채집 속도 +25%, 공사에 도구 가진 사람이 있으면 건설 속도 +25%
+    GEAR_TIME_MULT: 0.75,          // 탐사 장비: 원정대에 가진 사람이 있으면 원정 시간 ×0.75
+    REPAIR: Object.freeze({ costRatio: 0.3, sec: 10 }), // 고장 난 방 수리: 건설비 30% (올림) + 10초 (1명 기준)
     DOOR_LEVELS: Object.freeze([
       Object.freeze({ hp: 300 }),
       Object.freeze({ hp: 600, cost: Object.freeze({ scrap: 40 }) }),
@@ -145,7 +152,20 @@ export const CONFIG = Object.freeze({
     CLOSE_FIGHT_HP_LOSS: 20,       // 1명 체력 -20
   }),
 
-  // ---------- 습격 마릿수 공식 (plan.md ③) — 좀비 자체는 M4 ----------
+  // ---------- 습격 (plan.md ①좀비, ③적 AI) ----------
+  ZOMBIES: Object.freeze({
+    normal: Object.freeze({ hpBase: 20, hpPerDay: 3, hpMult: 1, doorDps: 2, speedMult: 1, fromDay: 1, chance: 1 }),
+    runner: Object.freeze({ hpMult: 0.6, doorDps: 2, speedMult: 2, fromDay: 3, chance: 0.2 }),
+    brute:  Object.freeze({ hpMult: 3, doorDps: 6, speedMult: 1, fromDay: 5, chance: 0.1 }),
+  }),
+  RAID_RULES: Object.freeze({
+    APPROACH_SEC: 10,              // 맵 가장자리 → 입구 이동 시간 (돌격형은 ÷2)
+    STAGGER_SEC: 0.25,             // 한 마리씩 줄지어 오게 하는 간격
+    DOOR_REGEN_PER_SEC: 0.01,      // 낮 동안 방폭문 초당 1% 회복
+    ROOM_BREAK_HP: 60,             // 침입 좀비가 방 하나를 고장 내는 데 필요한 피해 (좀비의 방폭문 피해와 같은 단위)
+    CONTACT_DPS: 20,               // 공격받는 방에서 일하던 생존자 초당 체력 감소 (부상이면 빠져나감)
+    DAWN_FIGHT_HP_LOSS: 15,        // 새벽에 남은 침입 좀비를 처치하며 전원 체력 감소
+  }),
   RAID: Object.freeze({
     BASE: 4,
     PER_DAY: 2,
@@ -175,6 +195,7 @@ export const CONFIG = Object.freeze({
     MIN_TOUCH_PX: 44,              // 버튼 최소 크기
     LOG_MAX: 200,                  // 기록 탭 최대 줄 수
     TOAST_SEC: 3,                  // 토스트 표시 시간
+    TOAST_MAX: 3,                  // 한 번에 보이는 토스트 수 (넘치면 오래된 것부터 지움)
     FPS_SMOOTHING: 0.1,            // FPS 표시 지수평활 계수
     MOBILE_W: 390,
     MOBILE_H: 844,

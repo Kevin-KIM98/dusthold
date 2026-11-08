@@ -342,8 +342,11 @@ test('창고를 지으면 자원별 저장 상한 +100', () => {
 });
 
 // ---------- ⑥-9 ----------
+// 습격(M4)이 결과에 섞이지 않도록 문을 아주 튼튼하게
+const noRaid = (s) => { s.door.hp = 1e9; return s; };
+
 test('⑥ 식량이나 물이 0인 채로 새벽이 오면 생존자 체력이 30 줄어든다', () => {
-  const s = createState(17);
+  const s = noRaid(createState(17));
   s.resources.food = 0;
   s.resources.water = 20;
   ticks(s, DAY_TICKS - 1);
@@ -353,7 +356,7 @@ test('⑥ 식량이나 물이 0인 채로 새벽이 오면 생존자 체력이 3
   assert.equal(s.resources.water, 20 - 4 * 2, '물은 정상 소비');
   assert.ok(s.log.some((e) => e.key === 'log.starve' && e.params.res === 'food'));
 
-  const s2 = createState(18);
+  const s2 = noRaid(createState(18));
   s2.resources.food = 0;
   s2.resources.water = 0;
   ticks(s2, DAY_TICKS);
@@ -361,19 +364,19 @@ test('⑥ 식량이나 물이 0인 채로 새벽이 오면 생존자 체력이 3
 });
 
 test('새벽 정산: 1인당 식량 2·물 2, 일부만 모자라면 모자란 인원만, 체력 0이면 사망', () => {
-  const s = createState(19);
+  const s = noRaid(createState(19));
   s.resources.food = 5; // 2명분 + 1
   ticks(s, DAY_TICKS);
   assert.equal(s.resources.food, 1);
   assert.equal(s.survivors.filter((v) => v.hp === 70).length, 2, '2명만 굶음');
-  const s2 = createState(20);
+  const s2 = noRaid(createState(20));
   s2.survivors[0].hp = 30;
   s2.resources.food = 0;
   ticks(s2, DAY_TICKS);
   assert.equal(s2.survivors.length, 3, '체력 0 → 사망');
   assert.ok(s2.log.some((e) => e.key === 'log.death'));
   // 밤 시작 굶주림 경고
-  const s3 = createState(21);
+  const s3 = noRaid(createState(21));
   s3.resources.water = 3;
   ticks(s3, CONFIG.TIME.DAYLIGHT_SEC * 10);
   assert.ok(s3.events.some((e) => e.key === 'toast.hungerWarn'));
@@ -437,7 +440,7 @@ test('길게 눌러 옮기기: 방 → 다른 방, 자리가 없으면 원래대
   assert.equal(buildersOf(s, st.id).length, 1);
 });
 
-test('벙커 진행(공사 중·근무·제작)이 저장·복원되고, v2 저장은 v3로 올라간다', () => {
+test('벙커 진행(공사 중·근무·제작)이 저장·복원되고, v2 저장은 최신 버전으로 올라간다', () => {
   const s = createState(25);
   rich(s);
   const d = startDig(s, 2, SC + 1);
@@ -455,7 +458,7 @@ test('벙커 진행(공사 중·근무·제작)이 저장·복원되고, v2 저�
   v2.survivors = v2.survivors.map(({ jobRef, ...rest }) => rest);
   const up = deserialize(JSON.stringify(v2));
   assert.ok(up);
-  assert.equal(up.version, 3);
+  assert.equal(up.version, CONFIG.SAVE.VERSION);
   assert.equal(up.bunker.rooms.length, 4);
   assert.ok(up.survivors.every((v) => v.jobRef === null));
 });

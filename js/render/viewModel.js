@@ -11,8 +11,9 @@ import {
 import { isAvailable, isInjured, combatPower } from '../sim/survivors.js';
 import {
   roomAt, digAt, isDug, canDig, canBuild, canCraft, buildersOf, workersOf, getBuildStage,
-  projectRemainingSec, roomDef, inBounds,
+  projectRemainingSec, roomDef, inBounds, turrets, canBuildTurret, canRepair, repairCost,
 } from '../sim/bunker.js';
+import { doorMax, canUpgradeDoor, defenseDps } from '../sim/raid.js';
 import { workerMap } from '../sim/economy.js';
 
 const S = CONFIG.SURFACE;
@@ -102,6 +103,8 @@ function survivorLine(s, withPower) {
   let txt = t('survivor.line', { name: s.name, spec: t('spec.' + s.specialty), hp: Math.floor(s.hp) });
   if (withPower) txt += ' · ' + t('survivor.power', { n: combatPower(s) });
   if (s.weapon) txt += ' · ' + t('survivor.weapon');
+  if (s.tool) txt += ' · ' + t('survivor.tool');
+  if (s.gear) txt += ' · ' + t('survivor.gear');
   if (isInjured(s)) txt += ' · ' + t('survivor.injured');
   return txt;
 }
@@ -128,6 +131,10 @@ export function surfacePanelModel(state, i, picker) {
 
   if (tile.type === 'entrance') {
     m.lines.push(t('panel.entrance'));
+    if (state.raid && state.raid.active) {
+      const near = state.raid.zombies.filter((z) => z.phase === 'approach').length;
+      if (near > 0) m.lines.push(t('panel.raidNear', { n: near }));
+    }
     if (state.waiting.length > 0) m.lines.push(t('panel.waiting', { n: state.waiting.length }));
   } else if (!tile.revealed) {
     m.lines.push(t('panel.fog'));
@@ -225,7 +232,7 @@ function projectLines(state, m, id, progress) {
 }
 
 function roomEffect(def, type) {
-  const n = def.perWorker || (def.produce && def.produce.perDay) || def.popCap || def.storageCap || def.healPerDay || def.dpsPerGuard
+  const n = def.perWorker || (def.produce && def.produce.perDay) || def.popCap || def.storageCap || def.healPerDay || def.dpsPerGuard || def.dps
     || (type === 'workshop' ? CONFIG.COMBAT.WEAPON_POWER : 0);
   return t('room.desc.' + type, { n });
 }
@@ -238,11 +245,43 @@ export function bunkerPanelModel(state, sel, picker) {
   if (!sel) return null;
   const m = { title: '', sub: '', lines: [], actions: [], list: [], picker: null, menu: null };
   if (sel.kind === 'door') {
-    const lv = CONFIG.BUNKER.DOOR_LEVELS[state.door.level - 1];
     m.title = t('room.door');
-    m.lines.push(t('bpanel.door', { hp: Math.ceil(state.door.hp), max: lv.hp, level: state.door.level }));
-    m.lines.push(t('bpanel.doorInfo'));
+    m.lines.push(t('bpanel.door', { hp: Math.ceil(state.door.hp), max: doorMax(state), level: state.door.level }));
+    m.lines.push(state.door.hp <= 0 ? t('bpanel.doorDamaged') : t('bpanel.doorInfo'));
+    const raid = state.raid;
+    if (raid && raid.active) {
+      const inside = raid.zombies.filter((z) => z.phase === 'inside').length;
+      if (inside > 0) m.lines.push(t('bpanel.raidInside', { n: inside }));
+      else m.lines.push(t('bpanel.raid', { n: raid.zombies.length, door: raid.zombies.filter((z) => z.phase === 'door').length, near: raid.zombies.filter((z) => z.phase === 'approach').length }));
+    }
+    m.lines.push(t('bpanel.defense', { n: defenseDps(state) }));
+    const tu = turrets(state);
+    const tdef = roomDef('turret');
+    m.lines.push(t('bpanel.turrets', { n: tu.filter((x) => x.done).length, max: tdef.max }));
+    const off = tu.filter((x) => x.done && !x.on).length;
+    if (off > 0) m.lines.push(t('bpanel.turretOff', { n: off }));
     if (state.waiting.length > 0) m.lines.push(t('panel.waiting', { n: state.waiting.length }));
+    // 강화
+    const next = CONFIG.BUNKER.DOOR_LEVELS[state.door.level];
+    const up = canUpgradeDoor(state);
+    if (next) m.actions.push({ action: 'upgradeDoor', label: t('action.upgradeDoor', { level: state.door.level + 1, cost: formatCost(next.cost) }), enabled: up.ok, reason: reasonText(up) });
+    // 포탑
+    const building = tu.find((x) => !x.done);
+    if (building) {
+      const remain = projectRemainingSec(state, building.id);
+      m.lines.push(Number.isFinite(remain)
+        ? t('bpanel.turretBuilding', { pct: pct(building.progress), time: formatMMSS(remain) })
+        : t('bpanel.turretStopped', { pct: pct(building.progress) }));
+      const builders = buildersOf(state, building.id);
+      for (const s of builders) m.list.push({ text: survivorLine(s, false), action: 'unassign', arg: s.id, label: t('action.unassign') });
+      const full = builders.length >= CONFIG.BUNKER.MAX_BUILDERS;
+      const anyone = state.survivors.some(isAvailable);
+      m.actions.push({ action: 'addBuilder', arg: building.id, label: t('action.addBuilder'), enabled: !full && anyone, reason: full ? t('reason.full') : anyone ? '' : t('picker.none'), primary: true });
+      if (picker && picker.target === building.id) m.picker = simplePicker(state, picker.mode);
+    } else if (tu.length < tdef.max) {
+      const c = canBuildTurret(state);
+      m.actions.push({ action: 'turret', label: t('action.turret', { cost: formatCost(tdef.cost) }), enabled: c.ok, reason: reasonText(c) });
+    }
     return m;
   }
   const { floor, col } = sel;
@@ -261,10 +300,21 @@ export function bunkerPanelModel(state, sel, picker) {
     m.lines.push(t('bpanel.stage.' + getBuildStage(room)));
     projectLines(state, m, room.id, room.progress);
     targetId = room.id;
+  } else if (room && room.repairing) {
+    m.title = t('room.' + room.type);
+    m.lines.push(t('bpanel.repairing'));
+    projectLines(state, m, room.id, room.progress);
+    targetId = room.id;
+  } else if (room && room.broken) {
+    m.title = t('room.' + room.type);
+    m.lines.push(t('bpanel.broken'));
+    const c = canRepair(state, room.id);
+    m.actions.push({ action: 'repair', arg: room.id, label: t('action.repair', { cost: formatCost(repairCost(room.type)) }), enabled: c.ok, reason: reasonText(c), primary: true });
   } else if (room) {
     const def = roomDef(room.type);
     m.title = t('room.' + room.type);
     m.lines.push(roomEffect(def, room.type));
+    if (room.damage > 0) m.lines.push(t('bpanel.roomDamage', { pct: pct(room.damage / CONFIG.RAID_RULES.ROOM_BREAK_HP) }));
     if (room.type !== 'shaft') {
       m.lines.push(!room.connected ? t('bpanel.disconnected') : room.on ? t('bpanel.on') : t('bpanel.off'));
       if (def.use > 0) m.lines.push(t('bpanel.use', { n: def.use }));
@@ -294,6 +344,8 @@ export function bunkerPanelModel(state, sel, picker) {
         }
       }
       if (state.items.weapon) m.lines.push(t('bpanel.weapons', { n: state.items.weapon }));
+      if (state.items.tool) m.lines.push(t('bpanel.stored', { item: t('item.tool'), n: state.items.tool }));
+      if (state.items.gear) m.lines.push(t('bpanel.stored', { item: t('item.gear'), n: state.items.gear }));
     }
   } else if (!isDug(state, floor, col)) {
     m.title = t('room.dirt');

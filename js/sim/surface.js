@@ -187,7 +187,8 @@ export function startExpedition(state, i, ids, kind) {
     s.job = 'expedition';
     s.jobTile = i;
   }
-  const ticks = secToTicks(expeditionSec(tile));
+  const gear = ids.some((id) => findSurvivor(state, id).gear);
+  const ticks = secToTicks(expeditionSec(tile) * (gear ? CONFIG.BUNKER.GEAR_TIME_MULT : 1));
   state.surface.expeditions.push({ id: state.surface.nextExpeditionId++, tile: i, kind, members: ids.slice(), ticksLeft: ticks, totalTicks: ticks });
   pushLog(state, 'log.depart', { tile: tile.revealed ? tile.type : 'fog', ring: tile.ring, n: ids.length });
   return OK;
@@ -306,7 +307,7 @@ function stepGathering(state) {
     const tile = getTile(state, s.jobTile);
     if (!tile || !isGatherable(tile) || isDepleted(tile) || isInjured(s)) { setRest(s); continue; }
     const g = TILES[tile.type].gather;
-    const bonus = s.specialty === 'gather' ? 1 + S.GATHER_SPECIALTY_BONUS : 1;
+    const bonus = (s.specialty === 'gather' ? 1 + S.GATHER_SPECIALTY_BONUS : 1) * (s.tool ? 1 + CONFIG.BUNKER.TOOL_SPEED_BONUS : 1);
     tile.acc += (g.perDay / T.DAY_SEC) * T.TICK_SEC * bonus;
     active.add(s.jobTile);
   }

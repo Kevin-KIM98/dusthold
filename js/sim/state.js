@@ -8,6 +8,7 @@ import { makeSurvivor } from './survivors.js';
 import { generateMap } from './surface.js';
 import { createBunker, createDoor } from './bunker.js';
 import { recomputeGrid } from './economy.js';
+import { createRaid } from './raid.js';
 
 export { pushLog, pushEvent };
 
@@ -34,6 +35,7 @@ export function createState(seed) {
     bunker: createBunker(),
     door: createDoor(),
     items: {},       // 보관 중인 제작품 (무기 등)
+    raid: createRaid(),
     log: [],         // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
     events: [],      // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
   };
@@ -101,6 +103,17 @@ export function migrate(raw) {
     };
     recomputeGrid(s);
   }
+  if (s.version === 3) {
+    // v3(M3) → v4(M4): 습격 상태, 도구·탐사 장비, 방 고장·수리 필드
+    s = {
+      ...s,
+      version: 4,
+      raid: createRaid(),
+      survivors: s.survivors.map((v) => ({ tool: false, gear: false, ...v })),
+      waiting: (s.waiting || []).map((v) => ({ tool: false, gear: false, jobRef: null, ...v })),
+      bunker: { ...s.bunker, rooms: s.bunker.rooms.map((r) => ({ repairing: false, damage: 0, ...r })) },
+    };
+  }
   if (s.version !== CONFIG.SAVE.VERSION) return null;
   return s;
 }
@@ -118,6 +131,7 @@ function isValidState(s) {
     s.bunker && Array.isArray(s.bunker.rooms) && Array.isArray(s.bunker.digs) &&
     Array.isArray(s.bunker.cells) && s.bunker.cells.length === s.bunker.cols * s.bunker.floors &&
     s.door && Number.isFinite(s.door.hp) &&
+    s.raid && Array.isArray(s.raid.zombies) &&
     T.SPEEDS.includes(s.speed) &&
     typeof s.paused === 'boolean'
   );

@@ -77,6 +77,11 @@ export function recomputeGrid(state) {
     }
   }
 
+  // 방폭문에 붙은 포탑: 1층 샤프트가 살아 있으면 연결
+  const shaft1 = (rows.get(1) || [])[B.SHAFT_COL];
+  const doorLinked = !!(shaft1 && shaft1.type === 'shaft' && shaft1.done);
+  for (const r of bk.rooms) if (ROOMS[r.type].attach === 'door' && r.done) r.connected = doorLinked;
+
   // 2) 생산
   const workers = workerMap(state);
   const working = (r) => r.done && r.connected && !r.broken;

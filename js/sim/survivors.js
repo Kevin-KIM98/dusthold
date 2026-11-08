@@ -18,7 +18,9 @@ export function makeSurvivor(state, rng, specialty) {
     job: 'rest',
     jobTile: null,   // 지상 채집·원정 대상 칸
     jobRef: null,    // 벙커 방·공사 id
-    weapon: false,
+    weapon: false,   // 무기: 전투력 +5
+    tool: false,     // 도구: 채집·건설 속도 +25%
+    gear: false,     // 탐사 장비: 원정 시간 -25%
   };
 }
 

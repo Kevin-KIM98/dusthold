@@ -101,7 +101,7 @@ test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwrig
     const saved = JSON.parse(savedAfter);
     assert.ok(saved.time.tick >= tickBefore);
     assert.equal(saved.resources.scrap, 55);
-    assert.equal(saved.version, 3);
+    assert.equal(saved.version, 4);
 
     await page.reload();
     await page.waitForSelector('#title:not([hidden])');
