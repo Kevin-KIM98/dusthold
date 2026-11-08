@@ -33,8 +33,13 @@ export function activeNestCount(state) {
 export function getRaidSize(state, day) {
   if (isPracticeDay(day)) return CONFIG.TUTORIAL.PRACTICE_RAID;
   const base = R.BASE + R.PER_DAY * (day - 1) + NEST.raidBonus * activeNestCount(state);
-  const mult = day % R.BIG_EVERY_DAYS === 0 ? R.BIG_MULT : 1;
-  return Math.min(Math.round(base * mult), R.MAX);
+  return Math.min(Math.round(base * bigRaidMult(day)), R.MAX);
+}
+
+/** 그날 밤 마릿수 배수: 5의 배수 날 = 대규모 (날짜별 배수가 있으면 그것), 아니면 1 */
+export function bigRaidMult(day) {
+  if (isPracticeDay(day) || day % R.BIG_EVERY_DAYS !== 0) return 1;
+  return R.BIG_MULT_BY_DAY[day] ?? R.BIG_MULT;
 }
 
 /** 연습 습격 날인가 (방폭문이 부서지지 않는다) */

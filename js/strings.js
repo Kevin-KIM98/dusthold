@@ -95,7 +95,7 @@ export const STRINGS = {
     'mission.defenseHow': '경비실에 사람 넣기 · 자동 포탑 · 방폭문 강화로 올려요',
     'mission.defenseImpossible': '오늘 밤 좀비 {n}마리 · 지금 문으로는 못 막아요 — 방폭문 강화부터',
     'mission.repelled': '오늘 밤 습격을 막아냈어요',
-    'mission.bigTomorrow': '내일 밤은 대규모 습격(좀비 1.5배)! 오늘 포탑·방폭문 강화·경비실을 미리 늘려 두세요.',
+    'mission.bigTomorrow': '내일 밤은 대규모 습격(좀비 {mult}배)! 오늘 포탑·방폭문 강화·경비실을 미리 늘려 두세요.',
     'mission.food': '내일 아침 식량 {cur}/{need}',
     'mission.water': '내일 아침 물 {cur}/{need}',
     'goal.build': '{room} {cur}/{need}개',

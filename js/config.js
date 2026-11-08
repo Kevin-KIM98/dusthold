@@ -195,6 +195,7 @@ export const CONFIG = Object.freeze({
     MAX: 40,
     BIG_EVERY_DAYS: 5,
     BIG_MULT: 1.5,
+    BIG_MULT_BY_DAY: Object.freeze({ 10: 1.2 }),  // 날짜별 대규모 배수 (영주 의견: 10일차가 너무 어려움 → 1.5 → 1.2)
   }),
 
   // ---------- 1일차 가이드·연습 습격 (plan v0.3) ----------

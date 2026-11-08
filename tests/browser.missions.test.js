@@ -64,7 +64,10 @@ test('브라우저: 미션 카드 — 가이드 뒤에 뜨고, 필수·목표 �
     // 4일차: 내일 대규모 습격 안내
     await st(() => { DUSTHOLD.setTick(2400 * 3 + 10); DUSTHOLD.render(); });
     await nextFrame(page);
-    assert.ok((await page.textContent('#ms-body')).includes('내일 밤은 대규모 습격'));
+    assert.ok((await page.textContent('#ms-body')).includes('내일 밤은 대규모 습격(좀비 1.5배)'));
+    await st(() => { DUSTHOLD.setTick(2400 * 8 + 10); DUSTHOLD.render(); });
+    await nextFrame(page);
+    assert.ok((await page.textContent('#ms-body')).includes('대규모 습격(좀비 1.2배)'), '9일차: 10일차는 1.2배');
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

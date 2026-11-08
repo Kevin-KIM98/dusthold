@@ -13,7 +13,7 @@ import {
   roomAt, digAt, isDug, canDig, canBuild, canCraft, buildersOf, workersOf, getBuildStage,
   projectRemainingSec, roomDef, inBounds, turrets, canBuildTurret, canRepair, repairCost,
 } from '../sim/bunker.js';
-import { doorMax, canUpgradeDoor, defenseDps } from '../sim/raid.js';
+import { doorMax, canUpgradeDoor, defenseDps, bigRaidMult } from '../sim/raid.js';
 import { currentStep, TUTORIAL_STEPS, guardCellFree, isTutorialActive } from '../sim/tutorial.js';
 import { dayMissions } from '../sim/missions.js';
 import { tileIndex } from '../sim/surface.js';
@@ -471,9 +471,9 @@ export function missionModel(state) {
   const goalDone = goals.filter((m) => m.done).length;
   const defense = must.find((m) => m.id === 'defense');
   const day = getDay(state);
-  const bigTomorrow = (day + 1) % CONFIG.RAID.BIG_EVERY_DAYS === 0 && day + 1 > CONFIG.TUTORIAL.PRACTICE_DAYS;
+  const bigMult = bigRaidMult(day + 1);
   return {
-    note: bigTomorrow ? t('mission.bigTomorrow') : '',
+    note: bigMult > 1 ? t('mission.bigTomorrow', { mult: bigMult }) : '',
     title: t('mission.title', { day: getDay(state) }),
     summary: t('mission.summary', { a: mustDone, b: must.length, c: goalDone, d: goals.length }),
     must: must.map((m) => ({ text: mustText(m), done: m.done })),
