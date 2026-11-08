@@ -2,6 +2,9 @@
 
 지상은 탐험, 지하는 건설. 밤마다 좀비가 방폭문을 두드리는 브라우저 생존 경영 게임.
 
+**바로 하기 (폰·PC):** https://kevin-kim98.github.io/dusthold/
+(성능 확인: https://kevin-kim98.github.io/dusthold/?worst)
+
 - 기획서: [design/plan.md](design/plan.md)
 - 진행 로그: [design/progress.md](design/progress.md)
 - Claude Code 작업 지침: [CLAUDE.md](CLAUDE.md)
