@@ -9,6 +9,8 @@ import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets } from '.
 import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
 import { drawZombie } from './zombieArt.js';
+import { drawSprite, drawSpriteFeet, drawSpritePart, tileSprite, hasSprite } from './sprites.js';
+import { drawZombieSprite } from './surfaceView.js';
 
 const V = CONFIG.BUNKER_VIEW;
 const BK = CONFIG.BUNKER;
@@ -84,6 +86,7 @@ export function createBunkerView() {
   };
 
   view.zoomAt = (f, sx, sy, w, h) => {
+    view.zoomChangedAt = performance.now();
     const before = view.toWorld(sx, sy, w, h);
     view.camera.zoom = Math.max(C.ZOOM_MIN, Math.min(C.ZOOM_MAX, view.camera.zoom * f));
     view.camera.cx = before.x - (sx - w / 2) / z();
@@ -130,8 +133,10 @@ export function createBunkerView() {
     }
   };
 
-  function rebuildCache(state) {
-    const s = V.CACHE_SCALE;
+  /** scale = 캐시 1월드px당 캔버스 픽셀 수. 화면 배율(줌 × 기기 배율)과 같으면 매 프레임 확대·축소 없이 1:1로 찍힌다 */
+  function rebuildCache(state, scale) {
+    const s = scale || V.CACHE_SCALE;
+    view.cacheScale = s;
     if (!view.cache) view.cache = document.createElement('canvas');
     view.cache.width = Math.round(ws.w * s);
     view.cache.height = Math.round(ws.h * s);
@@ -140,27 +145,52 @@ export function createBunkerView() {
     // 하늘 (낮·밤에 따라) — 캐시에 같이 구워서 매 프레임 덧칠을 줄인다
     g.fillStyle = isNight(state) ? PAL.skyNight : PAL.sky;
     g.fillRect(0, 0, ws.w, V.SKY_H);
-    // 흙 (깊을수록 어둡게)
+    // 흙 (깊을수록 어둡게) — 이미지가 있으면 위쪽 흙·깊은 흙 텍스처를 바둑판으로
     const top = V.SKY_H;
+    const mid = top + (BK.MAX_FLOORS / 2) * V.CELL_H;
+    const soilImg = tileSprite(g, 'soil.top', 0, top, ws.w, ws.h, V.SOIL_TILE, V.SOIL_TILE);
+    if (soilImg) {
+      // 깊은 흙: 한 층 높이에 걸쳐 점점 진하게 섞어서 경계선이 안 보이게
+      const bands = V.SOIL_BLEND_BANDS;
+      const bh = V.CELL_H / bands;
+      for (let k = 0; k < bands; k++) {
+        g.globalAlpha = (k + 1) / (bands + 1);
+        tileSprite(g, 'soil.deep', 0, mid - V.CELL_H + k * bh, ws.w, mid - V.CELL_H + (k + 1) * bh, V.SOIL_TILE, V.SOIL_TILE);
+      }
+      g.globalAlpha = 1;
+      tileSprite(g, 'soil.deep', 0, mid, ws.w, ws.h, V.SOIL_TILE, V.SOIL_TILE);
+    }
     const grad = g.createLinearGradient(0, top, 0, ws.h);
-    grad.addColorStop(0, PAL.soil);
-    grad.addColorStop(1, PAL.soilDeep);
+    if (soilImg) {
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.35)');
+    } else {
+      grad.addColorStop(0, PAL.soil);
+      grad.addColorStop(1, PAL.soilDeep);
+    }
     g.fillStyle = grad;
     g.fillRect(0, top, ws.w, ws.h - top);
-    // 흙 알갱이 (고정 패턴)
-    g.fillStyle = PAL.soilDot;
-    for (let k = 0; k < 260; k++) {
-      const x = (k * 97) % ws.w, y = top + ((k * 53) % (ws.h - top));
-      g.fillRect(x, y, 3, 2);
+    if (!soilImg) {
+      // 흙 알갱이 (고정 패턴)
+      g.fillStyle = PAL.soilDot;
+      for (let k = 0; k < 260; k++) {
+        const x = (k * 97) % ws.w, y = top + ((k * 53) % (ws.h - top));
+        g.fillRect(x, y, 3, 2);
+      }
     }
-    // 풀 띠
-    g.fillStyle = PAL.grass;
-    g.fillRect(0, top - V.GRASS_H, ws.w, V.GRASS_H);
+    // 풀 띠 (이미지: 지표면 띠의 풀~흙 윗부분만)
+    if (hasSprite('ground.strip')) {
+      for (let x = 0; x < ws.w; x += V.STRIP_W) drawSpritePart(g, 'ground.strip', 0, 0.27, 1, 0.55, x, top - V.GRASS_H - 8, V.STRIP_W + 0.5, V.GRASS_H + 16);
+    } else {
+      g.fillStyle = PAL.grass;
+      g.fillRect(0, top - V.GRASS_H, ws.w, V.GRASS_H);
+    }
     // 파낸 칸
     for (let f = 1; f <= BK.MAX_FLOORS; f++) {
       for (let c = 0; c < BK.COLS; c++) {
         if (!isDug(state, f, c)) continue;
         const r = cellRect(f, c);
+        if (drawSprite(g, 'cell.cave', r.x, r.y, r.w, r.h)) continue;
         g.fillStyle = PAL.wall;
         g.fillRect(r.x, r.y, r.w, r.h);
         g.fillStyle = PAL.cave;
@@ -180,7 +210,11 @@ export function createBunkerView() {
   /** ui: { selected: {kind,floor,col}|null, now: ms, paused } */
   view.draw = (ctx, w, h, state, ui) => {
     if (!view.camera.fitted) view.fit(w, h);
-    if (view.cacheKey !== cacheKeyOf(state) || view.cacheState !== state) rebuildCache(state);
+    const dpr = ctx.getTransform().a || 1;
+    const want = Math.min(V.CACHE_SCALE_MAX, z() * dpr);
+    const stale = view.cacheKey !== cacheKeyOf(state) || view.cacheState !== state;
+    const rescale = Math.abs(want - (view.cacheScale || 0)) > 0.01 && performance.now() - (view.zoomChangedAt || 0) > V.ZOOM_SETTLE_MS;
+    if (stale || rescale) rebuildCache(state, want);
     const now = ui.now || 0;
     const dt = view.lastNow ? Math.min(0.1, (now - view.lastNow) / 1000) : 0;
     view.lastNow = now;
@@ -195,8 +229,13 @@ export function createBunkerView() {
     if (o.y + wh < h) ctx.fillRect(0, o.y + wh, w, h - o.y - wh);
     if (o.x > 0) ctx.fillRect(0, 0, o.x, h);
     if (o.x + ww < w) ctx.fillRect(o.x + ww, 0, w - o.x - ww, h);
-    ctx.imageSmoothingQuality = 'low';
-    ctx.drawImage(view.cache, o.x, o.y, ww, wh);
+    if (Math.abs(view.cacheScale - z() * dpr) < 0.01) {
+      // 1:1 — 기기 픽셀 경계에 맞춰 찍어 확대·축소 필터를 피한다
+      ctx.drawImage(view.cache, Math.round(o.x * dpr) / dpr, Math.round(o.y * dpr) / dpr, view.cache.width / dpr, view.cache.height / dpr);
+    } else {
+      ctx.imageSmoothingQuality = 'low';
+      ctx.drawImage(view.cache, o.x, o.y, ww, wh); // 확대·축소 중엔 잠깐 늘려 쓴다
+    }
 
     drawSurface(ctx, state, S, zz, now);
     drawCables(ctx, state, S, zz);
@@ -258,15 +297,20 @@ function doorRect() {
 function drawSurface(ctx, state, S, zz, now) {
   const d = doorRect();
   const p = S(d.x, d.y);
-  ctx.fillStyle = PAL.doorDark;
-  ctx.fillRect(p.x - 4 * zz, p.y - 4 * zz, (d.w + 8) * zz, (d.h + 4) * zz);
-  ctx.fillStyle = PAL.door;
-  ctx.fillRect(p.x, p.y, d.w * zz, d.h * zz);
-  // 문 체력 줄무늬 (체력 비율만큼 밝게)
   const max = BK.DOOR_LEVELS[state.door.level - 1].hp;
   const ratio = Math.max(0, Math.min(1, state.door.hp / max));
-  ctx.fillStyle = '#e0c040';
-  for (let k = 0; k < 3; k++) ctx.fillRect(p.x + (6 + k * 15) * zz, p.y + 6 * zz, 8 * zz, 4 * zz);
+  if (!drawSprite(ctx, 'door.side', p.x - 6 * zz, p.y - 8 * zz, (d.w + 12) * zz, (d.h + 8) * zz)) {
+    ctx.fillStyle = PAL.doorDark;
+    ctx.fillRect(p.x - 4 * zz, p.y - 4 * zz, (d.w + 8) * zz, (d.h + 4) * zz);
+    ctx.fillStyle = PAL.door;
+    ctx.fillRect(p.x, p.y, d.w * zz, d.h * zz);
+    // 문 줄무늬
+    ctx.fillStyle = '#e0c040';
+    for (let k = 0; k < 3; k++) ctx.fillRect(p.x + (6 + k * 15) * zz, p.y + 6 * zz, 8 * zz, 4 * zz);
+  } else if (ratio <= 0) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; // 부서진 문
+    ctx.fillRect(p.x - 6 * zz, p.y - 8 * zz, (d.w + 12) * zz, (d.h + 8) * zz);
+  }
   ctx.fillStyle = PAL.barBg;
   ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz, 4 * zz);
   ctx.fillStyle = ratio > 0.5 ? '#6abf4b' : ratio > 0.25 ? '#e0a030' : '#e0504a';
@@ -279,7 +323,12 @@ function drawSurface(ctx, state, S, zz, now) {
   }
   // 공사 중이면 크레인
   const building = state.bunker.digs.length > 0 || state.bunker.rooms.some((r) => !r.done);
-  if (building) {
+  if (building && hasSprite('crane')) {
+    // 크레인 이미지 (갈고리 쪽이 오른쪽 → 문 쪽을 보게 뒤집는다), 살짝 흔들림
+    const base = S(d.x + d.w + 52, V.SKY_H - V.GRASS_H + 2);
+    const sway = Math.sin(now / 900) * 0.6 * zz;
+    drawSpriteFeet(ctx, 'crane', base.x + sway, base.y, 92 * zz, true);
+  } else if (building) {
     const base = S(d.x + d.w + 40, V.SKY_H - V.GRASS_H);
     const top = S(d.x + d.w + 40, 18);
     ctx.strokeStyle = PAL.crane;
@@ -350,10 +399,21 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
   const x = p.x, y = p.y, w = W * zz, h = H * zz;
   if (!r.done) {
     const stage = getBuildStage(r);
-    ctx.fillStyle = PAL.cave;
-    ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz);
-    if (stage === 'frame') drawFrame(ctx, x, y, w, h, zz, PAL.rooms[r.type]);
-    drawScaffold(ctx, x, y, w, h, zz, stage === 'frame' ? 0.45 : 1);
+    if (stage === 'frame') {
+      // 골조: 완성될 방이 흐릿하게 + 철골
+      ctx.globalAlpha = 0.45;
+      const ghost = drawSprite(ctx, 'room.' + r.type, x + 1, y + 1, w - 2, h - 2);
+      ctx.globalAlpha = 1;
+      if (!ghost) { ctx.fillStyle = PAL.cave; ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz); }
+      if (!drawSprite(ctx, 'frame', x + 2 * zz, y + 4 * zz, w - 4 * zz, h - 6 * zz)) drawFrame(ctx, x, y, w, h, zz, PAL.rooms[r.type]);
+      ctx.globalAlpha = 0.45;
+      if (!drawSprite(ctx, 'scaffold', x + 2 * zz, y + 4 * zz, w - 4 * zz, h - 6 * zz)) drawScaffold(ctx, x, y, w, h, zz, 1);
+      ctx.globalAlpha = 1;
+    } else {
+      // 비계: 파낸 굴 위에 나무 비계
+      if (!hasSprite('cell.cave')) { ctx.fillStyle = PAL.cave; ctx.fillRect(x + 2 * zz, y + 3 * zz, w - 4 * zz, h - 6 * zz); }
+      if (!drawSprite(ctx, 'scaffold', x + 2 * zz, y + 4 * zz, w - 4 * zz, h - 6 * zz)) drawScaffold(ctx, x, y, w, h, zz, 1);
+    }
     drawLabel(ctx, x, y, zz, t('room.' + r.type), true);
     drawBar(ctx, x, y, w, h, zz, r.progress);
     const builders = buildersOf(state, r.id);
@@ -361,7 +421,7 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
       const swing = (Math.sin(now / 500 + k * 2) + 1) / 2;
       const fx = x + (0.2 + 0.6 * swing) * w;
       const fy = y + h - 10 * zz;
-      drawPerson(ctx, fx, fy, zz, s, Math.sin(now / 120 + k));
+      drawPerson(ctx, fx, fy, zz, s, 0, { working: true, now, flip: Math.cos(now / 500 + k * 2) < 0 });
       view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
     });
     return;
@@ -373,17 +433,19 @@ function drawRoom(ctx, state, r, S, zz, now, view) {
   workers.forEach((s, k) => {
     const fx = x + ((k + 1) / (slots + 1)) * w;
     const fy = y + h - 8 * zz;
-    drawPerson(ctx, fx, fy, zz, s, r.on ? Math.sin(now / 300 + k) * 0.5 : 0);
+    drawPerson(ctx, fx, fy, zz, s, 0, { working: r.on, now, flip: k % 2 === 1 });
     view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
   });
   if (r.craft) drawBar(ctx, x, y, w, h, zz, r.craft.progress);
   if (r.repairing) {
-    drawScaffold(ctx, x, y, w, h, zz, 0.6);
+    ctx.globalAlpha = 0.7;
+    if (!drawSprite(ctx, 'scaffold', x + 2 * zz, y + 4 * zz, w - 4 * zz, h - 6 * zz)) drawScaffold(ctx, x, y, w, h, zz, 1);
+    ctx.globalAlpha = 1;
     drawBar(ctx, x, y, w, h, zz, r.progress);
     buildersOf(state, r.id).forEach((s, k) => {
       const fx = x + (0.3 + 0.4 * ((Math.sin(now / 500 + k * 2) + 1) / 2)) * w;
       const fy = y + h - 10 * zz;
-      drawPerson(ctx, fx, fy, zz, s, Math.sin(now / 120 + k));
+      drawPerson(ctx, fx, fy, zz, s, 0, { working: true, now });
       view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
     });
   }
@@ -409,9 +471,12 @@ function drawRoomStatic(ctx, r) {
   const rr = cellRect(r.floor, r.col);
   const x = rr.x, y = rr.y, w = rr.w * r.w, h = rr.h, zz = 1;
   const def = roomDef(r.type);
-  ctx.fillStyle = PAL.rooms[r.type];
-  ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
-  drawFurniture(ctx, r, x, y, w, h, zz, 0);
+  const img = drawSprite(ctx, 'room.' + r.type, x + 1, y + 1, w - 2, h - 2);
+  if (!img) {
+    ctx.fillStyle = PAL.rooms[r.type];
+    ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
+    drawFurniture(ctx, r, x, y, w, h, zz, 0);
+  }
   if (r.type !== 'shaft') drawLabel(ctx, x, y, zz, t('room.' + r.type), !r.on);
   if (r.broken) {
     ctx.fillStyle = PAL.off;
@@ -427,8 +492,10 @@ function drawRoomStatic(ctx, r) {
   if (!r.on && r.type !== 'shaft') {
     ctx.fillStyle = PAL.off;
     ctx.fillRect(x + 2, y + 3, w - 4, h - 6);
-    drawBolt(ctx, x + w - 14, y + 16, 9, r.connected ? PAL.bolt : PAL.boltOff, !r.connected);
-  } else if (r.on && r.type !== 'shaft' && def.use > 0) {
+    if (!drawSprite(ctx, r.connected ? 'icon.power' : 'icon.powerOff', x + w - 24, y + 6, 18, 18)) {
+      drawBolt(ctx, x + w - 14, y + 16, 9, r.connected ? PAL.bolt : PAL.boltOff, !r.connected);
+    }
+  } else if (r.on && r.type !== 'shaft' && def.use > 0 && !img) {
     // 켜진 방 천장등
     ctx.fillStyle = 'rgba(255,230,140,0.12)';
     ctx.beginPath();
@@ -447,17 +514,24 @@ function drawDig(ctx, state, d, S, zz, now, view, dt, paused) {
   const w = rr.w * zz, h = rr.h * zz;
   // 판 만큼 흙을 걷어낸다 (왼쪽/오른쪽 중 샤프트 쪽에서부터)
   const fromLeft = d.col > BK.SHAFT_COL || (d.col === BK.SHAFT_COL);
-  ctx.fillStyle = PAL.cave;
-  if (d.col === BK.SHAFT_COL) ctx.fillRect(p.x + 2 * zz, p.y, w - 4 * zz, h * d.progress);
-  else if (fromLeft) ctx.fillRect(p.x, p.y + 3 * zz, w * d.progress, h - 6 * zz);
-  else ctx.fillRect(p.x + w * (1 - d.progress), p.y + 3 * zz, w * d.progress, h - 6 * zz);
+  const pr = d.progress;
+  let cave;
+  if (d.col === BK.SHAFT_COL) cave = drawSpritePart(ctx, 'cell.cave', 0, 0, 1, pr, p.x, p.y, w, h * pr);
+  else if (fromLeft) cave = drawSpritePart(ctx, 'cell.cave', 0, 0, pr, 1, p.x, p.y, w * pr, h);
+  else cave = drawSpritePart(ctx, 'cell.cave', 1 - pr, 0, 1, 1, p.x + w * (1 - pr), p.y, w * pr, h);
+  if (!cave) {
+    ctx.fillStyle = PAL.cave;
+    if (d.col === BK.SHAFT_COL) ctx.fillRect(p.x + 2 * zz, p.y, w - 4 * zz, h * pr);
+    else if (fromLeft) ctx.fillRect(p.x, p.y + 3 * zz, w * pr, h - 6 * zz);
+    else ctx.fillRect(p.x + w * (1 - pr), p.y + 3 * zz, w * pr, h - 6 * zz);
+  }
   drawBar(ctx, p.x, p.y, w, h, zz, d.progress);
   const builders = buildersOf(state, d.id);
   builders.forEach((s, k) => {
     const fx = p.x + (fromLeft ? w * d.progress * 0.8 + 6 * zz : w * (1 - d.progress * 0.8) - 6 * zz) + k * 10 * zz * (fromLeft ? -1 : 1);
     const fy = p.y + h - 8 * zz;
-    drawPerson(ctx, fx, fy, zz, s, 0);
-    drawPick(ctx, fx + (fromLeft ? 6 : -6) * zz, fy - 18 * zz, zz, now + k * 200, fromLeft);
+    drawPerson(ctx, fx, fy, zz, s, 0, { working: true, now, flip: !fromLeft });
+    drawPick(ctx, fx + (fromLeft ? 7 : -7) * zz, fy - 14 * zz, zz, now + k * 200, fromLeft);
     view.figures.push({ id: s.id, x: fx, y: fy - 12 * zz });
   });
   if (builders.length > 0 && !paused && dt > 0) {
@@ -490,7 +564,7 @@ function drawRaid(ctx, state, S, zz, now, ws) {
     }
     const p = S(wx, groundY);
     const lunge = z.phase === 'door' ? Math.max(0, Math.sin(now / 160 + z.id)) * 3 * zz * (left ? 1 : -1) : 0;
-    drawZombie(ctx, p.x + lunge, p.y, zz, z.type, left ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
+    if (!drawZombieSprite(ctx, p.x + lunge, p.y, zz, z, left ? 1 : -1, now)) drawZombie(ctx, p.x + lunge, p.y, zz, z.type, left ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
   }
   // 문을 두드리는 충격
   if (!raid.breached && raid.zombies.some((z) => z.phase === 'door') && Math.sin(now / 90) > 0.6) {
@@ -507,7 +581,7 @@ function drawRaid(ctx, state, S, zz, now, ws) {
     const width = target ? r0.w * target.w : r0.w;
     inside.slice(0, 12).forEach((z, k) => {
       const p = S(r0.x + ((k + 0.5) / Math.min(12, inside.length)) * width, r0.y + r0.h - 6);
-      drawZombie(ctx, p.x, p.y, zz * 0.85, z.type, k % 2 ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
+      if (!drawZombieSprite(ctx, p.x, p.y, zz * 0.85, z, k % 2 ? 1 : -1, now)) drawZombie(ctx, p.x, p.y, zz * 0.85, z.type, k % 2 ? 1 : -1, now + z.id * 97, z.hp / z.maxHp);
     });
   }
 }
@@ -519,23 +593,30 @@ function drawTurret(ctx, state, tu, S, zz, now) {
   const p = S(bx, d.y + d.h - 14);
   const k = zz;
   if (!tu.done) {
-    ctx.globalAlpha = 0.5;
-    ctx.strokeStyle = PAL.scaffold;
-    ctx.lineWidth = 1.5 * k;
-    ctx.strokeRect(p.x, p.y - 6 * k, 12 * k, 20 * k);
-    ctx.globalAlpha = 1;
+    if (!drawSprite(ctx, 'scaffold', p.x - 2 * k, p.y - 6 * k, 16 * k, 20 * k)) {
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = PAL.scaffold;
+      ctx.lineWidth = 1.5 * k;
+      ctx.strokeRect(p.x, p.y - 6 * k, 12 * k, 20 * k);
+      ctx.globalAlpha = 1;
+    }
     ctx.fillStyle = PAL.barBg;
     ctx.fillRect(p.x, p.y + 16 * k, 12 * k, 3 * k);
     ctx.fillStyle = PAL.bar;
     ctx.fillRect(p.x, p.y + 16 * k, 12 * k * tu.progress, 3 * k);
     return;
   }
-  ctx.fillStyle = '#5a5f64';
-  ctx.fillRect(p.x, p.y + 4 * k, 12 * k, 10 * k);
-  ctx.fillStyle = tu.on ? '#8a9096' : '#4a4e52';
-  ctx.beginPath(); ctx.arc(p.x + 6 * k, p.y + 4 * k, 6 * k, Math.PI, 0); ctx.fill();
   const dir = left ? -1 : 1;
-  ctx.fillRect(p.x + 6 * k + (dir < 0 ? -12 * k : 0), p.y + 1 * k, 12 * k, 3 * k);
+  if (!tu.on) ctx.globalAlpha = 0.6;
+  const img = drawSpriteFeet(ctx, 'turret', p.x + 6 * k, p.y + 14 * k, 20 * k, left);
+  ctx.globalAlpha = 1;
+  if (!img) {
+    ctx.fillStyle = '#5a5f64';
+    ctx.fillRect(p.x, p.y + 4 * k, 12 * k, 10 * k);
+    ctx.fillStyle = tu.on ? '#8a9096' : '#4a4e52';
+    ctx.beginPath(); ctx.arc(p.x + 6 * k, p.y + 4 * k, 6 * k, Math.PI, 0); ctx.fill();
+    ctx.fillRect(p.x + 6 * k + (dir < 0 ? -12 * k : 0), p.y + 1 * k, 12 * k, 3 * k);
+  }
   const raid = state.raid;
   const firing = tu.on && raid && raid.active && raid.zombies.some((z) => z.phase !== 'approach');
   if (firing && Math.sin(now / 50 + tu.id) > 0.3) {
@@ -552,7 +633,8 @@ function drawCracks(ctx, x, y, w, h, zz) {
   ctx.moveTo(x + w * 0.3, y + 6 * zz); ctx.lineTo(x + w * 0.4, y + h * 0.4); ctx.lineTo(x + w * 0.32, y + h * 0.6); ctx.lineTo(x + w * 0.45, y + h - 8 * zz);
   ctx.moveTo(x + w * 0.4, y + h * 0.4); ctx.lineTo(x + w * 0.6, y + h * 0.45); ctx.lineTo(x + w * 0.7, y + h * 0.3);
   ctx.stroke();
-  // 렌치 대신 느낌표 삼각형 (고장 표시)
+  // 고장 표시: 경고 아이콘 (없으면 느낌표 삼각형)
+  if (drawSprite(ctx, 'icon.warn', x + w - 24 * zz, y + 6 * zz, 18 * zz, 18 * zz)) return;
   const cx = x + w - 14 * zz, cy = y + 16 * zz;
   ctx.fillStyle = '#e0a030';
   ctx.beginPath(); ctx.moveTo(cx, cy - 8 * zz); ctx.lineTo(cx + 8 * zz, cy + 6 * zz); ctx.lineTo(cx - 8 * zz, cy + 6 * zz); ctx.closePath(); ctx.fill();
@@ -620,9 +702,17 @@ function drawBolt(ctx, cx, cy, s, color, slash) {
 }
 
 /** 발 위치 (fx, fy) 기준 사람. bob = 위아래 흔들림 */
-function drawPerson(ctx, fx, fy, zz, s, bob) {
+/** opts: { working: 일하는 중이면 2프레임 번갈아, now, flip: 왼쪽 보기 } */
+function drawPerson(ctx, fx, fy, zz, s, bob, opts) {
   const k = zz;
   const by = fy - (bob || 0) * 1.5 * k;
+  const o = opts || {};
+  const frame = o.working ? Math.floor((o.now || 0) / V.WORK_FRAME_MS + (s.id % 2)) % 2 : 0;
+  const ph = V.PERSON_H * k;
+  if (drawSpriteFeet(ctx, `surv.${s.specialty}.${frame}`, fx, by, ph, !!o.flip)) {
+    if (s.hp <= CONFIG.SURVIVOR.INJURED_HP) drawSprite(ctx, 'icon.injured', fx - 5 * k, by - ph - 10 * k, 10 * k, 10 * k);
+    return;
+  }
   ctx.fillStyle = PAL.spec[s.specialty] || '#ccc';
   ctx.fillRect(fx - 4 * k, by - 16 * k, 8 * k, 10 * k);   // 몸
   ctx.fillStyle = '#2a2420';
@@ -642,6 +732,9 @@ function drawPick(ctx, x, y, zz, now, right) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(right ? a : -a);
+  if (!right) ctx.scale(-1, 1);
+  if (drawSprite(ctx, 'pickaxe', -4 * zz, -14 * zz, 12 * zz, 14 * zz)) { ctx.restore(); return; }
+  if (!right) ctx.scale(-1, 1);
   ctx.strokeStyle = '#8a6a48';
   ctx.lineWidth = 2 * zz;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -12 * zz); ctx.stroke();

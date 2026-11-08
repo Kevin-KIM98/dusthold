@@ -105,9 +105,16 @@ export const CONFIG = Object.freeze({
     SIDE: 20,                      // 좌우 흙 여백
     BOTTOM: 30,
     CACHE_SCALE: 2,
+    CACHE_SCALE_MAX: 3,            // 배경 캐시 해상도 상한 (줌 × 기기 배율, 메모리 보호)
+    ZOOM_SETTLE_MS: 250,           // 확대·축소가 멈추고 이만큼 지나면 배경 캐시를 새 배율로 다시 그린다
     FIGURE_HIT_PX: 22,             // 길게 눌러 사람 잡기 반경
     DIG_PARTICLES_PER_SEC: 14,
     SPARKLE_COUNT: 24,
+    SOIL_TILE: 64,                 // 흙 텍스처 한 칸 크기 (월드 px)
+    SOIL_BLEND_BANDS: 12,          // 위쪽 흙 → 깊은 흙을 섞는 단계 수 (한 층 높이)
+    STRIP_W: 80,                   // 지표면 풀 띠 이미지 한 장 폭
+    PERSON_H: 26,                  // 사람 이미지 높이 (줌 1)
+    WORK_FRAME_MS: 350,            // 일하는 사람 2프레임 바꾸는 간격
   }),
   FX: Object.freeze({
     MAX_PARTICLES: 150,            // 성능 상한
@@ -210,7 +217,8 @@ export const CONFIG = Object.freeze({
     MIN_TOUCH_PX: 44,              // 버튼 최소 크기
     LOG_MAX: 200,                  // 기록 탭 최대 줄 수
     TOAST_SEC: 3,                  // 토스트 표시 시간
-    TOAST_MAX: 3,                  // 한 번에 보이는 토스트 수 (넘치면 오래된 것부터 지움)
+    TOAST_MAX: 3,
+    ICON_PX: 18,                   // 상단 바 자원 아이콘 크기                  // 한 번에 보이는 토스트 수 (넘치면 오래된 것부터 지움)
     FPS_SMOOTHING: 0.1,            // FPS 표시 지수평활 계수
     MOBILE_W: 390,
     MOBILE_H: 844,

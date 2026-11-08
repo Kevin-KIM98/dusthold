@@ -3,6 +3,7 @@
 import { CONFIG } from '../config.js';
 import { t } from '../strings.js';
 import { topBarModel, clockModel, logModel, panelKey } from './viewModel.js';
+import { spriteCss } from './sprites.js';
 
 const el = {};
 let lastRendered = { bar: null, clock: null, logLen: -1, logLast: null };
@@ -175,6 +176,17 @@ export function renderPanel(model) {
     if (pk.depart && !pk.depart.enabled && pk.depart.reason) btns.appendChild(mkText('span', 'pn-reason', pk.depart.reason));
     box.appendChild(btns);
     body.appendChild(box);
+  }
+}
+
+/** 상단 바 자원 아이콘을 이미지로 (M6). 이미지가 없으면 CSS 도형 그대로 */
+export function applyIconSprites() {
+  for (const id of Object.keys(el.resEls || {})) {
+    const ico = el.resEls[id].item.querySelector('.ico');
+    const css = spriteCss('icon.' + id, CONFIG.UI.ICON_PX);
+    if (!ico || !css) continue;
+    ico.classList.add('ico-img');
+    Object.assign(ico.style, css);
   }
 }
 

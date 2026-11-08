@@ -138,3 +138,6 @@ body[data-phase="night"] #clockbar .count { color: #9fb3d9; }
 #ov-buttons .btn { width: 100%; min-height: 48px; font-size: 16px; }
 #overlay.hint #ov-buttons { flex-direction: row; }
 #overlay.hint #ov-buttons .btn { min-height: 44px; font-size: 14px; }
+
+/* M6: 이미지 아이콘 (도형 모양 지우기) */
+.ico.ico-img { width: 18px; height: 18px; border: 0; border-radius: 0; transform: none; clip-path: none; background-color: transparent; background-repeat: no-repeat; }

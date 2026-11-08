@@ -13,12 +13,13 @@ import {
 import { upgradeDoor } from './sim/raid.js';
 import {
   initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas,
-  armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay,
+  armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay, applyIconSprites,
 } from './render/ui.js';
 import { createSurfaceView } from './render/surfaceView.js';
 import { createBunkerView } from './render/bunkerView.js';
 import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText } from './render/viewModel.js';
 import { initInput, initCanvasInput } from './input.js';
+import { loadSprites, spriteStats } from './render/sprites.js';
 
 const app = {
   state: null,
@@ -464,6 +465,14 @@ function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
   window.addEventListener('pagehide', saveNow);
 
+  // M6 이미지: 불러오면 캐시를 다시 그린다. 실패하면 도형 그대로
+  loadSprites().then((ok) => {
+    if (!ok) return;
+    if (app.surfaceView) app.surfaceView.invalidate();
+    if (app.bunkerView) app.bunkerView.invalidate();
+    applyIconSprites();
+  });
+
   const { exists } = readSave();
   showTitle(exists);
   // 폰에서 성능 확인: index.html?worst
@@ -486,6 +495,7 @@ function boot() {
     get bunkerCamera() { return app.bunkerView && app.bunkerView.camera; },
     get particles() { return app.bunkerView ? app.bunkerView.fx.count() : 0; },
     get worst() { return app.worst; },
+    spriteStats,
     get fps() { return app.fps; },
     toggleWorst,
     occupiedCells: () => occupiedCells(app.state),

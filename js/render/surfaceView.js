@@ -7,6 +7,7 @@ import { isNight } from '../sim/clock.js';
 import { canExplore, centerIndex, tileXY, isDepleted } from '../sim/surface.js';
 import { zombiePos } from '../sim/raid.js';
 import { drawZombie } from './zombieArt.js';
+import { drawSprite, drawSpriteFeet } from './sprites.js';
 
 const C = CONFIG.CAMERA;
 const PAL = {
@@ -157,9 +158,14 @@ export function createSurfaceView() {
       const px = center.x + (tgt.x - center.x) * k;
       const py = center.y + (tgt.y - center.y) * k;
       ctx.fillStyle = exp.kind === 'attack' ? '#ff8a6a' : PAL.exp;
+      const back = prog >= 0.5; // 돌아오는 길이면 입구 쪽을 본다
       for (let m = 0; m < exp.members.length; m++) {
+        const mx = px + (m - (exp.members.length - 1) / 2) * tp * 0.22;
+        const sv = state.survivors.find((v) => v.id === exp.members[m]);
+        const flip = (tgt.x < center.x) !== back;
+        if (sv && drawSpriteFeet(ctx, `surv.${sv.specialty}.0`, mx, py + tp * 0.18, tp * 0.42, flip)) continue;
         ctx.beginPath();
-        ctx.arc(px + (m - (exp.members.length - 1) / 2) * tp * 0.14, py, Math.max(3, tp * 0.07), 0, Math.PI * 2);
+        ctx.arc(mx, py, Math.max(3, tp * 0.07), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -194,12 +200,29 @@ export function createSurfaceView() {
         }
         const sp = view.worldToScreen(p.x, p.y, w, h);
         const face = p.x <= n / 2 ? 1 : -1;
-        drawZombie(ctx, sp.x, sp.y + 8 * k, k, z.type, face, now + z.id * 97, z.hp / z.maxHp);
+        if (!drawZombieSprite(ctx, sp.x, sp.y + 8 * k, k, z, face, now)) drawZombie(ctx, sp.x, sp.y + 8 * k, k, z.type, face, now + z.id * 97, z.hp / z.maxHp);
       }
     }
   };
 
   return view;
+}
+
+const ZOMBIE_H = { normal: 26, runner: 24, brute: 38 }; // 줌 1에서 화면 높이(px)
+
+/** 좀비 이미지 + 걷는 흔들림 + 체력 막대. 이미지가 없으면 false */
+export function drawZombieSprite(ctx, x, y, k, z, face, now) {
+  const h = ZOMBIE_H[z.type] * k;
+  const bob = Math.abs(Math.sin((now + z.id * 97) / (z.type === 'runner' ? 90 : 180))) * 2 * k;
+  if (!drawSpriteFeet(ctx, 'zombie.' + z.type, x, y - bob, h, face < 0)) return false;
+  if (z.hp < z.maxHp) {
+    const bw = 14 * k;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x - bw / 2, y - h - 5 * k, bw, 2.5 * k);
+    ctx.fillStyle = '#e0504a';
+    ctx.fillRect(x - bw / 2, y - h - 5 * k, bw * Math.max(0, z.hp / z.maxHp), 2.5 * k);
+  }
+  return true;
 }
 
 function drawBadge(ctx, x, y, r, text) {
@@ -218,7 +241,22 @@ function drawBadge(ctx, x, y, r, text) {
 }
 
 // ---------- 타일 하나 (0,0)~(s,s) ----------
+/** 타일 이미지 이름 (M6). 없으면 아래 도형으로 */
+function tileSprite(tile) {
+  if (!tile.revealed) return 'tile.fog';
+  const spent = (tile.type === 'box' || tile.type === 'camp') && tile.cleared;
+  if (spent) return 'tile.barren';
+  if (tile.type === 'nest' && tile.cleared) return 'tile.nestCleared';
+  return 'tile.' + tile.type;
+}
+
 function drawTile(g, tile, s, explorable) {
+  if (drawSprite(g, tileSprite(tile), 0, 0, s, s)) {
+    if (!tile.revealed) { if (explorable) drawExplorable(g, s); return; }
+    if (tile.type === 'base' && tile.cleared) drawX(g, s);
+    if (isDepleted(tile)) { g.fillStyle = PAL.dim; g.fillRect(0, 0, s, s); }
+    return;
+  }
   if (!tile.revealed) return drawFog(g, s, explorable);
   const type = tile.type;
   const spent = (type === 'box' || type === 'camp') && tile.cleared;
@@ -254,19 +292,21 @@ function drawFog(g, s, explorable) {
     g.arc(s * (0.2 + 0.13 * k), s * (0.3 + 0.4 * ((k * 37) % 7) / 7), s * 0.08, 0, Math.PI * 2);
     g.fill();
   }
-  if (explorable) {
-    g.strokeStyle = PAL.fogEdge;
-    g.lineWidth = s * 0.03;
-    g.setLineDash([s * 0.08, s * 0.06]);
-    g.strokeRect(s * 0.12, s * 0.12, s * 0.76, s * 0.76);
-    g.setLineDash([]);
-    // 물음표 대신 작은 다이아몬드
-    g.fillStyle = PAL.fogEdge;
-    g.beginPath();
-    g.moveTo(s * 0.5, s * 0.38); g.lineTo(s * 0.6, s * 0.5); g.lineTo(s * 0.5, s * 0.62); g.lineTo(s * 0.4, s * 0.5);
-    g.closePath();
-    g.fill();
-  }
+  if (explorable) drawExplorable(g, s);
+}
+
+/** 탐험할 수 있는 안개 칸 표시 (점선 테두리 + 작은 다이아몬드) */
+function drawExplorable(g, s) {
+  g.strokeStyle = PAL.fogEdge;
+  g.lineWidth = s * 0.03;
+  g.setLineDash([s * 0.08, s * 0.06]);
+  g.strokeRect(s * 0.12, s * 0.12, s * 0.76, s * 0.76);
+  g.setLineDash([]);
+  g.fillStyle = PAL.fogEdge;
+  g.beginPath();
+  g.moveTo(s * 0.5, s * 0.38); g.lineTo(s * 0.6, s * 0.5); g.lineTo(s * 0.5, s * 0.62); g.lineTo(s * 0.4, s * 0.5);
+  g.closePath();
+  g.fill();
 }
 
 function drawEntrance(g, s) {

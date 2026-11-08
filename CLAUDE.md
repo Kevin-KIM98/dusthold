@@ -61,3 +61,4 @@ assets/  tests/  design/{plan.md,progress.md}
 - 폰 확인: GitHub Pages(main 브랜치 루트) 켜서 링크로 열기
 - 성능 확인: 게임 중 `F9` 또는 주소 뒤에 `?worst` → 최악 장면 + FPS 표시 (저장 안 됨)
 - 밸런스 확인: `node tools/balance.js [시드 수] [최대 일수]` → 자동 플레이어로 여러 판을 끝까지 돌린 결과 표
+- 아트 다시 묶기: `python3 tools/build_atlas.py` → `assets/src/*_sheet.png`(Higgsfield 원본)를 잘라 `assets/*.png`·`assets/atlas.js`로 (게임 실행엔 필요 없음, Pillow 필요)
