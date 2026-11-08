@@ -343,13 +343,13 @@ test('둥지 격전: 이겼어도 여유가 요구치의 50% 미만이면 1명 �
   assert.ok(t2.every((v) => v.hp === 100), '넉넉하면 아무도 안 다침');
 });
 
-test('습격 마릿수 공식: 링 3 밖 둥지는 세지 않고, 5일차는 1.5배, 최대 40', () => {
+test('습격 마릿수 공식: 링 3 밖 둥지는 세지 않고, 5일차는 1.2배, 최대 40', () => {
   const s = createState(44);
   for (const t of s.surface.tiles) if (t.type === 'nest') { t.type = 'forest'; }
   assert.equal(getRaidSize(s, 1), CONFIG.TUTORIAL.PRACTICE_RAID, '1일차는 연습 습격');
   assert.equal(getRaidSize(s, 2), 6);
   assert.equal(getRaidSize(s, 4), 10);
-  assert.equal(getRaidSize(s, 5), Math.round(12 * 1.5));
+  assert.equal(getRaidSize(s, 5), Math.round(12 * 1.2));
   setTile(s, idx(s, 5, 0), 'nest'); // 링 5
   assert.equal(getRaidSize(s, 2), 6, '링 5 둥지는 영향 없음');
   setTile(s, idx(s, 5, 2), 'nest'); // 링 3

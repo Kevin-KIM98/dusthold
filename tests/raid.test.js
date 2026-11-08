@@ -286,13 +286,13 @@ test('방폭문 강화: Lv2 600(고철 40), Lv3 1000(고철 80·목재 20)', () 
 });
 
 // ---------- ⑥-4 ----------
-test('⑥ 5일차 습격이 평소의 1.5배 규모다', () => {
+test('⑥ 5일차 습격이 평소의 1.2배 규모다 (v0.6)', () => {
   const s = noNests(createState(140));
   s.door.hp = 1e9;
   toNight(s, 5);
   tick(s);
   const normal5 = 4 + 2 * (5 - 1); // 12
-  assert.equal(s.raid.zombies.length, Math.round(normal5 * 1.5), '5일차 18마리');
+  assert.equal(s.raid.zombies.length, Math.round(normal5 * 1.2), '5일차 14마리');
   const s4 = noNests(createState(141));
   s4.door.hp = 1e9;
   toNight(s4, 6);
@@ -300,7 +300,7 @@ test('⑥ 5일차 습격이 평소의 1.5배 규모다', () => {
   assert.equal(s4.raid.zombies.length, 4 + 2 * 5, '6일차는 다시 평소 공식 (14)');
   assert.equal(getRaidSize(s, 10), Math.round((4 + 18) * 1.2), '10일차는 1.2배 (v0.5: 영주 의견으로 완화)');
   assert.equal(getRaidSize(s, 15), Math.min(Math.round((4 + 28) * 1.5), 40), '15일차부터 다시 1.5배 (최대 40)');
-  assert.deepEqual([4, 5, 9, 10, 15].map(bigRaidMult), [1, 1.5, 1, 1.2, 1.5]);
+  assert.deepEqual([4, 5, 9, 10, 15].map(bigRaidMult), [1, 1.2, 1, 1.2, 1.5]);
 });
 
 // ---------- 저장 ----------
