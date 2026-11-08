@@ -142,8 +142,8 @@ export const CONFIG = Object.freeze({
       box:       Object.freeze({ minRing: 1, oneTime: true, randomReward: Object.freeze({ min: 20, max: 40, pool: Object.freeze(['food', 'water', 'wood', 'scrap']) }) }),
       camp:      Object.freeze({ minRing: 2, oneTime: true, survivors: Object.freeze({ min: 1, max: 2 }) }),
       nest:      Object.freeze({ minRing: 2, powerPerRing: 10, clearReward: Object.freeze({ scrap: 30 }), raidBonus: 2, raidBonusMaxRing: 3 }),
-      // 군 기지: 맵에 1곳 고정, 요구 전투력 35 (plan v0.1.1 — 전투 특기 2 + 일반 1, 전원 무기 = 36)
-      base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 35, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
+      // 군 기지: 맵에 1곳 고정, 요구 전투력 30 (plan v0.2.1 — 일반 생존자 3명이 모두 무기를 들면 10×3 = 30)
+      base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 30, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
     }),
     // 링별 등장 비율 (가중치). 군 기지는 따로 1곳 배치.
     // v0.2 밸런싱: 링 2~3은 둥지를 드물게(첫날 밤 습격 마릿수), 생존자 캠프를 자주(인구 증가)

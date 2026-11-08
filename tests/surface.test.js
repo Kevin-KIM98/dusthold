@@ -362,24 +362,24 @@ test('⑥ 군 기지를 클리어하면 통신부품 1개를 얻는다', () => {
   const bi = s.surface.tiles.findIndex((t) => t.type === 'base');
   const base = s.surface.tiles[bi];
   base.revealed = true;
-  assert.equal(requiredPower(base), 35, '기획서 v0.1.1 요구 전투력');
+  assert.equal(requiredPower(base), 30, '기획서 v0.2.1 요구 전투력');
   const ticksTo = Math.round((S.EXPEDITION_SEC_PER_RING * base.ring) / TICK);
   assert.ok(base.ring >= 4 && base.ring <= 5);
   const team = s.survivors.slice(0, 3);
 
-  // 1) 전투력 부족(전투 특기 1 + 일반 2, 전원 무기 = 33 < 35): 부상 귀환, 통신부품 없음
-  team.forEach((v, k) => { v.specialty = k === 0 ? 'combat' : 'gather'; v.weapon = true; });
-  assert.equal(partyPower(s, team.map((v) => v.id)), 33);
+  // 1) 전투력 부족(일반 3명, 무기 2개 = 10+10+5 = 25 < 30): 부상 귀환, 통신부품 없음
+  team.forEach((v, k) => { v.specialty = 'gather'; v.weapon = k < 2; });
+  assert.equal(partyPower(s, team.map((v) => v.id)), 25);
   startExpedition(s, bi, team.map((v) => v.id), 'attack');
   ticks(s, ticksTo);
   assert.equal(s.resources.parts, 0);
   assert.equal(base.cleared, false);
   assert.ok(team.every((v) => v.hp <= CONFIG.SURVIVOR.INJURED_HP));
 
-  // 2) 전투 특기 2 + 일반 1, 전원 무기 = 36 ≥ 35: 통신부품 +1, 고철 +40
+  // 2) 일반 3명이 모두 무기 = 30 ≥ 30: 통신부품 +1, 고철 +40 (전투 특기 없이도 된다)
   for (const v of s.survivors) v.hp = 100;
-  team[1].specialty = 'combat';
-  assert.equal(partyPower(s, team.map((v) => v.id)), 36);
+  team[2].weapon = true;
+  assert.equal(partyPower(s, team.map((v) => v.id)), 30);
   const scrap0 = s.resources.scrap;
   assert.equal(startExpedition(s, bi, team.map((v) => v.id), 'attack').ok, true);
   ticks(s, ticksTo);
