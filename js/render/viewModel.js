@@ -480,6 +480,7 @@ export function missionModel(state) {
     how: defense && !defense.done && !defense.repelled ? t('mission.defenseHow') : '',
     goals: goals.map((m) => ({ text: goalText(m), done: m.done })),
     allMust: mustDone === must.length,
+    allDone: mustDone === must.length && goalDone === goals.length,
   };
 }
 

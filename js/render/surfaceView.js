@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../config.js';
 import { isNight } from '../sim/clock.js';
+import { drawNightVeil } from './ambience.js';
 import { canExplore, centerIndex, tileXY, isDepleted } from '../sim/surface.js';
 import { zombiePos } from '../sim/raid.js';
 import { drawZombie } from './zombieArt.js';
@@ -179,10 +180,9 @@ export function createSurfaceView() {
       ctx.strokeRect(p.x + 1.5, p.y + 1.5, tp - 3, tp - 3);
     }
 
-    if (isNight(state)) {
-      ctx.fillStyle = PAL.night;
-      ctx.fillRect(0, 0, w, h);
-    }
+    // 밤 어둠: 해 질 녘·새벽에 서서히 (ui.night 0..1, 없으면 밤/낮으로)
+    const night = ui && ui.night !== undefined ? ui.night : (isNight(state) ? 1 : 0);
+    drawNightVeil(ctx, w, h, night);
 
     // 1일차 가이드가 가리키는 칸 (깜빡이는 테두리, 밤 어둠 위에)
     if (ui && ui.guideTile >= 0) {

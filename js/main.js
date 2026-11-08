@@ -22,6 +22,9 @@ import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText, tutoria
 import { isTutorialActive, skipTutorial } from './sim/tutorial.js';
 import { initInput, initCanvasInput } from './input.js';
 import { loadSprites, spriteStats } from './render/sprites.js';
+import { nightLevel, createShake, doorStep, veilOpacity } from './render/ambience.js';
+
+const SHAKE_BG = '#0d1013';
 
 const app = {
   state: null,
@@ -44,6 +47,10 @@ const app = {
   worstBackup: null,
   hintQueue: [],
   missionsCollapsed: false, // 미션 카드 접힘
+  lastAllDone: null,        // 미션 전부 달성 (막 달성하면 카드를 접는다)
+  shake: createShake(),     // 화면 흔들림 (연출)
+  doorStep: null,           // 방폭문 체력 칸 (줄면 흔들기)
+  veil: -1,                 // 밤 가장자리 어둠 진하기 (마지막으로 넣은 값)
   lastMustMet: null,        // 필수 미션 달성 여부 (바뀔 때 알림)
   hintPausedBefore: false,
 };
@@ -155,6 +162,8 @@ function startGame(state, opts = {}) {
   app.picker = null;
   app.missionsCollapsed = false;
   app.lastMustMet = null;
+  app.lastAllDone = null;
+  app.doorStep = null;
   app.surfaceView = createSurfaceView();
   app.bunkerView = createBunkerView();
   showGame();
@@ -225,11 +234,38 @@ function draw(now, guide) {
   if (app.view === 'log' || app.cssW === 0) return;
   const tg = guide && guide.target;
   const ctx = app.ctx; // 두 화면 모두 캔버스 전체를 칠하므로 따로 지우지 않는다
-  if (app.view === 'surface') {
-    app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now, guideTile: tg && tg.view === 'surface' ? tg.tile : -1 });
-  } else {
-    app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, paused: app.state.paused, guideCell: tg && tg.view === 'bunker' ? tg.cell : null });
+  const night = nightLevel(app.state);
+  const off = app.shake.offset(now);
+  if (off) {
+    // 흔들려서 드러나는 가장자리만 칠하고 옮긴다
+    const W = app.cssW, H = app.cssH;
+    ctx.save();
+    ctx.fillStyle = SHAKE_BG;
+    if (off.x > 0) ctx.fillRect(0, 0, off.x, H); else if (off.x < 0) ctx.fillRect(W + off.x, 0, -off.x, H);
+    if (off.y > 0) ctx.fillRect(0, 0, W, off.y); else if (off.y < 0) ctx.fillRect(0, H + off.y, W, -off.y);
+    ctx.translate(off.x, off.y);
   }
+  if (app.view === 'surface') {
+    app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now, night, guideTile: tg && tg.view === 'surface' ? tg.tile : -1 });
+  } else {
+    app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, night, paused: app.state.paused, guideCell: tg && tg.view === 'bunker' ? tg.cell : null });
+  }
+  if (off) ctx.restore();
+}
+
+/** 밤 가장자리 어둠 (CSS 층, 바뀔 때만) */
+function setVeil(op) {
+  if (op === app.veil) return;
+  app.veil = op;
+  document.getElementById('night-veil').style.opacity = String(op);
+}
+
+/** 방폭문이 맞아 체력이 한 칸 줄 때마다 살짝 흔든다 (습격 중, 문이 버티는 동안) */
+function watchDoor(now) {
+  const raid = app.state.raid;
+  const step = doorStep(app.state);
+  if (raid.active && !raid.breached && app.doorStep !== null && step < app.doorStep) app.shake.kick('small', now);
+  app.doorStep = step;
 }
 
 function drainEvents() {
@@ -240,12 +276,14 @@ function drainEvents() {
     else if (e.key.startsWith('outcome.')) showOutcome(e.key.slice('outcome.'.length));
     else {
       showToast(formatMessage(e.key, e.params));
+      if (e.key === 'toast.breach') app.shake.kick('big', performance.now());
+      if (e.key === 'toast.roomBroken') app.shake.kick('small', performance.now());
       if (e.key === 'toast.raidWarning') {
         queueHint('raid');
         const mm = missionModel(app.state);
         if (mm && !mm.allMust) { showToast(t('toast.missionDanger')); app.missionsCollapsed = false; }
       }
-      if (e.key === 'toast.newDay') { queueHint('goal'); app.missionsCollapsed = false; app.lastMustMet = null; }
+      if (e.key === 'toast.newDay') { queueHint('goal'); app.missionsCollapsed = false; app.lastMustMet = null; app.lastAllDone = null; }
     }
   }
   ev.length = 0;
@@ -398,7 +436,9 @@ function frame(ts) {
   } else if (app.debug) setDebug(true, t('debug.fps', { fps: Math.round(app.fps), tick: app.state.time.tick }));
 
   const guide = app.worst ? null : tutorialModel(app.state);
+  watchDoor(ts);
   draw(ts, guide);
+  setVeil(veilOpacity(nightLevel(app.state), app.view));
   renderUI(app.state);
   renderPanel(currentPanelModel());
   renderGuide(guide, app.view);
@@ -409,6 +449,9 @@ function frame(ts) {
     // 필수 미션을 막 다 지켰으면 알림 (밤이 되기 전)
     if (app.lastMustMet === false && missions.allMust && !isNight(app.state)) showToast(t('toast.missionSafe'));
     app.lastMustMet = missions.allMust;
+    // 오늘 미션을 전부 끝냈으면 카드를 접는다 (요약 한 줄만)
+    if (app.lastAllDone === false && missions.allDone) app.missionsCollapsed = true;
+    app.lastAllDone = missions.allDone;
   }
   requestAnimationFrame(frame);
 }
@@ -481,6 +524,8 @@ function boot() {
     onDragCancel() { bunkerDrag.cancel(); },
   });
 
+  // 움직임 줄이기 설정이면 화면 흔들림을 끈다
+  if (window.matchMedia) app.shake.setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   // 모바일: 길게 누를 때 뜨는 메뉴 막기
   app.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('resize', () => { resizeCanvas(); drawTitleArt(); });

@@ -5,6 +5,7 @@
 import { CONFIG } from '../config.js';
 import { t } from '../strings.js';
 import { isNight } from '../sim/clock.js';
+import { nightColor } from './ambience.js';
 import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets, canDig, digAt } from '../sim/bunker.js';
 import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
@@ -17,7 +18,7 @@ const BK = CONFIG.BUNKER;
 const C = CONFIG.CAMERA;
 
 export const PAL = {
-  bg: '#0d1013', sky: '#7d9bb3', skyNight: '#121a2b', grass: '#4d7a3a', soil: '#5a4330', soilDeep: '#3f2e21', soilDot: 'rgba(0,0,0,0.18)',
+  bg: '#0d1013', sky: '#7d9bb3', grass: '#4d7a3a', soil: '#5a4330', soilDeep: '#3f2e21', soilDot: 'rgba(0,0,0,0.18)',
   cave: '#2b2622', wall: '#1a1714', selected: '#ffd54f', cableOn: '#ffd54f', cableOff: '#5a5a5a',
   off: 'rgba(0,0,0,0.6)', bolt: '#ffd54f', boltOff: '#d0504a', label: 'rgba(255,255,255,0.95)', labelDark: 'rgba(255,255,255,0.6)', labelBg: 'rgba(12,10,8,0.62)', digHint: 'rgba(255,226,150,0.45)', below: '#20160f',
   scaffold: '#c9a25a', frame: '#9aa0a6', bar: '#ffd54f', barBg: 'rgba(0,0,0,0.6)',
@@ -144,8 +145,8 @@ export function createBunkerView() {
     view.cache.height = Math.round(ws.h * s);
     const g = view.cache.getContext('2d');
     g.setTransform(s, 0, 0, s, 0, 0);
-    // 하늘 (낮·밤에 따라) — 캐시에 같이 구워서 매 프레임 덧칠을 줄인다
-    g.fillStyle = isNight(state) ? PAL.skyNight : PAL.sky;
+    // 하늘 (낮 색으로 굽고, 밤 어둠은 매 프레임 위에 서서히 덮는다)
+    g.fillStyle = PAL.sky;
     g.fillRect(0, 0, ws.w, V.SKY_H);
     // 흙 (깊을수록 어둡게) — 이미지가 있으면 위쪽 흙·깊은 흙 텍스처를 바둑판으로
     const top = V.SKY_H;
@@ -226,7 +227,7 @@ export function createBunkerView() {
     view.cacheState = state;
   }
 
-  const cacheKeyOf = (state) => state.bunker.rev + (isNight(state) ? 'n' : 'd') + '|' + roomsSignature(state) + '|' + state.bunker.digs.map((d) => d.id).join('.');
+  const cacheKeyOf = (state) => state.bunker.rev + '|' + roomsSignature(state) + '|' + state.bunker.digs.map((d) => d.id).join('.');
 
   view.invalidate = () => { view.cacheKey = null; };
 
@@ -260,6 +261,17 @@ export function createBunkerView() {
     } else {
       ctx.imageSmoothingQuality = 'low';
       ctx.drawImage(view.cache, o.x, o.y, ww, wh); // 확대·축소 중엔 잠깐 늘려 쓴다
+    }
+
+    // 밤 어둠: 하늘은 진하게, 땅속(방 불빛)은 살짝. 문·포탑·사람·좀비는 그 위에 그려 잘 보이게
+    const night = ui.night !== undefined ? ui.night : (isNight(state) ? 1 : 0);
+    if (night > 0) {
+      const A = CONFIG.AMBIENCE;
+      const gy = Math.max(0, Math.min(h, S(0, V.SKY_H).y));
+      ctx.fillStyle = nightColor(A.BUNKER_SKY_ALPHA * night);
+      ctx.fillRect(0, 0, w, gy);
+      ctx.fillStyle = nightColor(A.BUNKER_UNDER_ALPHA * night);
+      ctx.fillRect(0, gy, w, h - gy);
     }
 
     drawSurface(ctx, state, S, zz, now);

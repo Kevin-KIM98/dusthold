@@ -91,6 +91,8 @@ export const STRINGS = {
     'mission.summary': '필수 {a}/{b} · 목표 {c}/{d}',
     'mission.must': '필수 — 다 지키면 오늘 밤 살아남아요',
     'mission.goals': '오늘의 목표',
+    'mission.allSafe': '필수 다 지킴 — 오늘 밤은 안전해요',
+    'mission.doneLine': '완료: {list}',
     'mission.defense': '오늘 밤 좀비 {n}마리 막기 · 방어 화력 {cur}/{need}',
     'mission.defenseHow': '경비실에 사람 넣기 · 자동 포탑 · 방폭문 강화로 올려요',
     'mission.defenseImpossible': '오늘 밤 좀비 {n}마리 · 지금 문으로는 못 막아요 — 방폭문 강화부터',

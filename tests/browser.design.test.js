@@ -60,3 +60,50 @@ for (const noImg of [false, true]) {
     }
   });
 }
+
+test('브라우저: 미션 카드 얇게(끝난 것은 한 줄), 다 끝내면 자동으로 접힘 · 해 질 녘·밤 가장자리 어둠', { skip: SKIP, timeout: 120000 }, async () => {
+  const { server, url } = await serve();
+  const browser = await playwright.chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await skipHints(ctx);
+  const page = await ctx.newPage();
+  const errors = collectErrors(page);
+  try {
+    await page.goto(url);
+    await page.click('#btn-new');
+    await page.evaluate(() => DUSTHOLD.setPaused(true));
+    await page.click('#gd-skip');
+    await nextFrame(page);
+    // 1일차: 식량·물은 이미 됨 → 한 줄로, 남은 목표(탐험)만 한 줄씩
+    assert.equal(await page.$$eval('#ms-body .ms-item', (els) => els.length), 1, '남은 것만 줄마다');
+    const doneLine = await page.textContent('#ms-body .ms-done');
+    assert.ok(doneLine.includes('식량') && doneLine.includes('물'), doneLine);
+    assert.ok((await page.textContent('#ms-body')).includes('오늘 밤은 안전해요'));
+    const cardH = await page.$eval('#missions', (e) => e.getBoundingClientRect().height);
+    assert.ok(cardH < 150, `카드 높이 ${cardH}`);
+    // 목표(탐험 2칸)까지 끝내면 자동으로 접힌다
+    await page.evaluate(() => {
+      const s = DUSTHOLD.state;
+      s.stats.explored = (s.stats.explored || 0) + 2;
+    });
+    await nextFrame(page); await nextFrame(page);
+    assert.ok((await page.textContent('#ms-summary')).includes('목표 1/1'));
+    assert.ok(await page.$eval('#missions', (e) => e.classList.contains('collapsed')), '다 끝내면 접힘');
+
+    // 밤: 지상 화면 가장자리 어둠이 짙어지고, 벙커에선 꺼진다
+    await page.evaluate(() => { DUSTHOLD.setTick(1800 + 5); DUSTHOLD.render(); });
+    await nextFrame(page); await nextFrame(page);
+    assert.equal(await page.$eval('#night-veil', (e) => getComputedStyle(e).opacity), '1');
+    await page.evaluate(() => { DUSTHOLD.setTick(1700); });
+    await nextFrame(page); await nextFrame(page);
+    const dusk = Number(await page.$eval('#night-veil', (e) => getComputedStyle(e).opacity));
+    assert.ok(dusk > 0 && dusk < 1, `해 질 녘엔 중간 (${dusk})`);
+    await page.click('[data-tab="bunker"]');
+    await nextFrame(page); await nextFrame(page);
+    assert.equal(await page.$eval('#night-veil', (e) => getComputedStyle(e).opacity), '0');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});

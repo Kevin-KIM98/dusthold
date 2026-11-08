@@ -141,6 +141,20 @@ export const CONFIG = Object.freeze({
   FX: Object.freeze({
     MAX_PARTICLES: 150,            // 성능 상한
   }),
+  // ---------- 밤 분위기 연출 (화면만, 게임 규칙과 무관) ----------
+  AMBIENCE: Object.freeze({
+    DUSK_SEC: 20,                  // 밤이 되기 이만큼 전부터 서서히 어두워진다
+    DAWN_SEC: 10,                  // 새벽이 되고 이만큼 동안 서서히 밝아진다
+    NIGHT_RGB: '6,10,28',          // 밤 어둠 색
+    SURFACE_ALPHA: 0.5,            // 지상 화면 밤 어둠 진하기 (최대)
+    // 밤 가장자리 어둠은 css/style.css #night-veil (진하기 = 밤 정도)
+    BUNKER_SKY_ALPHA: 0.85,        // 벙커 화면 하늘 부분
+    BUNKER_UNDER_ALPHA: 0.18,      // 벙커 화면 땅속 (방 불빛이 있어 살짝만)
+    SHAKE_SMALL: Object.freeze({ amp: 3, ms: 220 }),   // 방폭문이 맞아 체력이 한 칸 줄 때·방이 부서질 때
+    SHAKE_BIG: Object.freeze({ amp: 8, ms: 600 }),     // 방폭문이 부서질 때
+    SHAKE_DOOR_STEPS: 10,          // 방폭문 체력을 이만큼 칸으로 나눠, 한 칸 줄 때마다 흔들기
+    SHAKE_FREQ_MS: 28,             // 흔들림 빠르기
+  }),
 
   // 성능 측정용 최악 장면 (plan.md ⑥ 성능): 지상 전부 밝힘 + 벙커 40칸 + 좀비 40 + 파티클 150
   WORST: Object.freeze({

@@ -255,17 +255,32 @@ export function renderMissions(model, view, collapsed) {
     row.appendChild(mkText('span', 'ms-text', it.text));
     return row;
   };
-  body.appendChild(mkText('p', 'ms-sec', t('mission.must')));
-  for (const it of model.must) body.appendChild(item(it));
-  if (model.how) body.appendChild(mkText('p', 'ms-how', model.how));
-  if (model.goals.length) {
+  // 아직 안 한 것만 한 줄씩, 끝난 것은 맨 아래 한 줄로 모은다 (카드를 얇게)
+  const mustLeft = model.must.filter((it) => !it.done);
+  const goalsLeft = model.goals.filter((it) => !it.done);
+  const done = [...model.must, ...model.goals].filter((it) => it.done);
+  if (mustLeft.length) {
+    body.appendChild(mkText('p', 'ms-sec', t('mission.must')));
+    for (const it of mustLeft) body.appendChild(item(it));
+    if (model.how) body.appendChild(mkText('p', 'ms-how', model.how));
+  } else {
+    body.appendChild(mkText('p', 'ms-safe', '✓ ' + t('mission.allSafe')));
+  }
+  if (goalsLeft.length) {
     body.appendChild(mkText('p', 'ms-sec', t('mission.goals')));
-    for (const it of model.goals) {
+    for (const it of goalsLeft) {
       const row = item(it);
-      if (!it.done) row.querySelector('.ms-mark').textContent = '○';
+      row.querySelector('.ms-mark').textContent = '○';
       body.appendChild(row);
     }
   }
+  if (done.length) {
+    const row = mkText('p', 'ms-done', '✓ ' + t('mission.doneLine', { list: done.map((it) => it.text).join(' · ') }));
+    row.title = row.textContent;
+    body.appendChild(row);
+  }
+  // 알림이 카드에 가리지 않게 카드 높이를 무대에 알려 준다
+  stage.style.setProperty('--ms-h', box.offsetHeight + 'px');
 }
 
 /** 패널 안에서 selectors에 맞는 버튼만 반짝인다 */
