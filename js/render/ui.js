@@ -79,7 +79,8 @@ export function initUI(handlers) {
   el.panelBody.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-action]');
     if (!b || b.disabled) return;
-    const arg = b.dataset.arg === undefined ? undefined : Number(b.dataset.arg);
+    const raw = b.dataset.arg;
+    const arg = raw === undefined ? undefined : (/^-?\d+$/.test(raw) ? Number(raw) : raw);
     handlers.onPanelAction(b.dataset.action, arg);
   });
 }
@@ -130,6 +131,18 @@ export function renderPanel(model) {
       if (!a.enabled && a.reason) row.appendChild(mkText('span', 'pn-reason', a.reason));
     }
     body.appendChild(row);
+  }
+  if (model.menu && !model.picker) {
+    const box = document.createElement('div');
+    box.className = 'menu';
+    box.appendChild(mkText('p', 'pk-title', model.menu.title));
+    for (const it of model.menu.items) {
+      const b = mkButton({ action: it.action, arg: it.arg, label: '', enabled: it.enabled }, 'menu-row');
+      b.appendChild(mkText('span', 'menu-label', it.label));
+      b.appendChild(mkText('span', it.enabled ? 'menu-sub' : 'menu-sub pn-reason', it.sub));
+      box.appendChild(b);
+    }
+    body.appendChild(box);
   }
   if (model.list.length > 0) {
     const ul = document.createElement('ul');

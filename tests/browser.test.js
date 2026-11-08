@@ -29,7 +29,7 @@ test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwrig
     const ids = await page.$$eval('#topbar .res', (els) => els.map((e) => e.dataset.res));
     assert.deepEqual(ids, ['food', 'water', 'wood', 'scrap', 'power', 'parts', 'pop']);
     const vals = await page.$$eval('#topbar .res .val', (els) => els.map((e) => e.textContent));
-    assert.deepEqual(vals, ['20', '20', '40', '25', '0/0', '0', '4/6']);
+    assert.deepEqual(vals, ['20', '20', '40', '25', '0/3', '0', '4/6']);
     await page.evaluate(() => { DUSTHOLD.state.resources.wood = 77; DUSTHOLD.state.resources.food = 1; });
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     assert.equal(await page.textContent('#topbar .res[data-res="wood"] .val'), '77');
@@ -101,7 +101,7 @@ test('브라우저: 뼈대 완료 기준 5개', { skip: !playwright && 'playwrig
     const saved = JSON.parse(savedAfter);
     assert.ok(saved.time.tick >= tickBefore);
     assert.equal(saved.resources.scrap, 55);
-    assert.equal(saved.version, 2);
+    assert.equal(saved.version, 3);
 
     await page.reload();
     await page.waitForSelector('#title:not([hidden])');

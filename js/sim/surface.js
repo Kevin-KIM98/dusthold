@@ -4,7 +4,7 @@ import { createRng, withRng } from './rng.js';
 import { pushLog, pushEvent } from './log.js';
 import { isNight, secToTicks, DAY_TICKS } from './clock.js';
 import { makeSurvivor, isAvailable, isInjured, combatPower, findSurvivor, setRest } from './survivors.js';
-import { addResource } from './economy.js';
+import { addResource } from './resources.js';
 
 const S = CONFIG.SURFACE;
 const TILES = S.TILES;
@@ -88,11 +88,10 @@ export function getTile(state, i) {
   return state.surface.tiles[i] || null;
 }
 
-/** 필요 전투력. tile.need가 있으면 그 칸만 따로 정한 값(이벤트·테스트용), 없으면 config. */
+/** 필요 전투력 (config) */
 export function requiredPower(tile) {
   const def = TILES[tile.type];
   if (!def) return 0;
-  if (Number.isFinite(tile.need)) return tile.need;
   if (def.powerRequired !== undefined) return def.powerRequired;
   if (def.powerPerRing !== undefined) return def.powerPerRing * tile.ring;
   return 0;

@@ -64,6 +64,13 @@ export function createSurfaceView() {
     view.camera.zoom = Math.max(C.ZOOM_MIN, Math.min(C.ZOOM_MAX, view.camera.zoom));
   };
 
+  /** 캔버스 크기가 바뀌어도 화면 위쪽 기준으로 그림이 제자리에 있게 (패널을 열어도 탭한 칸이 손가락 아래에 그대로) */
+  view.onResize = (oldW, oldH, w, h) => {
+    if (oldH === 0) return;
+    view.camera.cy += (h - oldH) / 2 / tilePx();
+    view.camera.cx += (w - oldW) / 2 / tilePx();
+  };
+
   view.pan = (dxPx, dyPx, state) => {
     view.camera.cx -= dxPx / tilePx();
     view.camera.cy -= dyPx / tilePx();

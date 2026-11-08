@@ -9,6 +9,9 @@ import {
   startExpedition, assignGatherer, unassign, requiredPower, partyPower,
 } from '../js/sim/surface.js';
 import { getRaidSize, activeNestCount } from '../js/sim/raid.js';
+import { withRng } from '../js/sim/rng.js';
+import { makeSurvivor } from '../js/sim/survivors.js';
+import { assignWorker, debugPlaceRoom } from '../js/sim/bunker.js';
 
 const S = CONFIG.SURFACE;
 const TICK = CONFIG.TIME.TICK_SEC;
@@ -161,20 +164,25 @@ test('탐험 보상: 폐허 고철10·농지 식량10·저수지 물15·상자 2
   assert.equal(s.surface.tiles[ci].cleared, true);
 });
 
-test('캠프: 인구 상한을 넘는 생존자는 입구에서 대기, 상한이 오르면 입주', () => {
+test('캠프: 인구 상한을 넘는 생존자는 입구에서 대기, 숙소가 생기면 입주', () => {
   const s = createState(13);
-  s.popCap = 4; // 꽉 참
+  // 인구 6/6으로 채운다
+  withRng(s, (rng) => { while (s.survivors.length < s.popCap) s.survivors.push(makeSurvivor(s, rng)); });
   const ci = idx(s, 5, 3);
   setTile(s, ci, 'camp');
   startExpedition(s, ci, ids(s, 1), 'explore');
   ticks(s, 400);
-  assert.equal(s.survivors.length, 4);
+  assert.equal(s.survivors.length, 6);
   assert.ok(s.waiting.length >= 1);
   const w = s.waiting.length;
-  s.popCap = 10; // 숙소 (M3)
+  // 숙소(M3)를 짓고 발전실에 사람을 넣어 전력을 켠다
+  const gen = s.bunker.rooms.find((r) => r.type === 'generator');
+  assignWorker(s, s.survivors[1].id, gen.id);
+  debugPlaceRoom(s, 'quarters', 2, 4);
+  assert.equal(s.popCap, 10);
   ticks(s, 1);
   assert.equal(s.waiting.length, 0);
-  assert.equal(s.survivors.length, 4 + w);
+  assert.equal(s.survivors.length, 6 + w);
   assert.equal(new Set(s.survivors.map((v) => v.name)).size, s.survivors.length, '이름 중복 없음');
 });
 
@@ -354,24 +362,24 @@ test('⑥ 군 기지를 클리어하면 통신부품 1개를 얻는다', () => {
   const bi = s.surface.tiles.findIndex((t) => t.type === 'base');
   const base = s.surface.tiles[bi];
   base.revealed = true;
-  assert.equal(requiredPower(base), 45, '기획서 v0.1 요구 전투력 그대로');
+  assert.equal(requiredPower(base), 35, '기획서 v0.1.1 요구 전투력');
   const ticksTo = Math.round((S.EXPEDITION_SEC_PER_RING * base.ring) / TICK);
   assert.ok(base.ring >= 4 && base.ring <= 5);
-
-  // 1) 전투력 부족(전투 특기 3명 + 무기 = 39 < 45): 부상 귀환, 통신부품 없음
   const team = s.survivors.slice(0, 3);
-  team.forEach((v) => { v.specialty = 'combat'; v.weapon = true; });
-  assert.equal(partyPower(s, team.map((v) => v.id)), 39);
+
+  // 1) 전투력 부족(전투 특기 1 + 일반 2, 전원 무기 = 33 < 35): 부상 귀환, 통신부품 없음
+  team.forEach((v, k) => { v.specialty = k === 0 ? 'combat' : 'gather'; v.weapon = true; });
+  assert.equal(partyPower(s, team.map((v) => v.id)), 33);
   startExpedition(s, bi, team.map((v) => v.id), 'attack');
   ticks(s, ticksTo);
   assert.equal(s.resources.parts, 0);
   assert.equal(base.cleared, false);
   assert.ok(team.every((v) => v.hp <= CONFIG.SURVIVOR.INJURED_HP));
 
-  // 2) 전투력 충분: 통신부품 +1, 고철 +40, 클리어 표시.
-  //    기획서 수치로는 3명 최대 39라 45에 못 미친다 → 이 칸만 요구치를 39로 두고 보상 판정을 확인 (progress.md 메모)
+  // 2) 전투 특기 2 + 일반 1, 전원 무기 = 36 ≥ 35: 통신부품 +1, 고철 +40
   for (const v of s.survivors) v.hp = 100;
-  base.need = 39;
+  team[1].specialty = 'combat';
+  assert.equal(partyPower(s, team.map((v) => v.id)), 36);
   const scrap0 = s.resources.scrap;
   assert.equal(startExpedition(s, bi, team.map((v) => v.id), 'attack').ok, true);
   ticks(s, ticksTo);

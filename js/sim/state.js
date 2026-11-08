@@ -6,6 +6,8 @@ import { createRng } from './rng.js';
 import { pushLog, pushEvent } from './log.js';
 import { makeSurvivor } from './survivors.js';
 import { generateMap } from './surface.js';
+import { createBunker, createDoor } from './bunker.js';
+import { recomputeGrid } from './economy.js';
 
 export { pushLog, pushEvent };
 
@@ -29,6 +31,9 @@ export function createState(seed) {
     waiting: [],     // 인구 상한 초과로 입구에서 대기 중인 생존자
     nextSurvivorId: 1,
     surface: generateMap(seed),
+    bunker: createBunker(),
+    door: createDoor(),
+    items: {},       // 보관 중인 제작품 (무기 등)
     log: [],         // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
     events: [],      // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
   };
@@ -37,6 +42,7 @@ export function createState(seed) {
     state.survivors.push(makeSurvivor(state, rng, specs[i % specs.length]));
   }
   state.rng = rng.getState();
+  recomputeGrid(state);
   pushLog(state, 'log.start', { n: state.survivors.length });
   return state;
 }
@@ -83,6 +89,18 @@ export function migrate(raw) {
       surface: generateMap(s.seed),
     };
   }
+  if (s.version === 2) {
+    // v2(M2) → v3(M3): 벙커·방폭문·보관함 추가. 벙커 일은 없었으니 시작 배치로.
+    s = {
+      ...s,
+      version: 3,
+      survivors: (s.survivors || []).map((v) => ({ jobRef: null, ...v })),
+      bunker: createBunker(),
+      door: createDoor(),
+      items: {},
+    };
+    recomputeGrid(s);
+  }
   if (s.version !== CONFIG.SAVE.VERSION) return null;
   return s;
 }
@@ -97,6 +115,9 @@ function isValidState(s) {
     s.surface && Array.isArray(s.surface.tiles) &&
     s.surface.tiles.length === s.surface.size * s.surface.size &&
     Array.isArray(s.surface.expeditions) &&
+    s.bunker && Array.isArray(s.bunker.rooms) && Array.isArray(s.bunker.digs) &&
+    Array.isArray(s.bunker.cells) && s.bunker.cells.length === s.bunker.cols * s.bunker.floors &&
+    s.door && Number.isFinite(s.door.hp) &&
     T.SPEEDS.includes(s.speed) &&
     typeof s.paused === 'boolean'
   );

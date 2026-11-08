@@ -4,7 +4,7 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 2,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵 추가)
+    VERSION: 3,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
 
@@ -30,6 +30,7 @@ export const CONFIG = Object.freeze({
   SURVIVOR: Object.freeze({
     HP: 100,
     INJURED_HP: 40,
+    STARVE_HP_LOSS: 30,            // 새벽 정산 때 식량·물이 모자란 인원 체력 감소 (각각)
     FOOD_PER_DAY: 2,
     WATER_PER_DAY: 2,
     SPECIALTIES: Object.freeze(['gather', 'build', 'combat', 'tech']),
@@ -41,6 +42,67 @@ export const CONFIG = Object.freeze({
   }),
 
   RESOURCE_ORDER: Object.freeze(['food', 'water', 'wood', 'scrap', 'power', 'parts']),
+
+  // ---------- 벙커 (plan.md ① 벙커 방, ② 전력망) ----------
+  BUNKER: Object.freeze({
+    COLS: 7,                       // 최대 7열 × 8층 = 56칸
+    MAX_FLOORS: 8,
+    SHAFT_COL: 3,                  // 승강기 샤프트 줄 (가운데)
+    START_SHAFT_FLOORS: 2,         // 시작 시 1~2층 샤프트
+    START_ROOMS: Object.freeze([
+      Object.freeze({ type: 'generator', floor: 1, col: 1 }),
+      Object.freeze({ type: 'water', floor: 1, col: 4 }),
+    ]),
+    DIG: Object.freeze({ cost: Object.freeze({ wood: 5 }), sec: 10 }),
+    MAX_BUILDERS: 2,               // 공사 하나에 최대 2명
+    TWO_BUILDERS_MULT: 0.6,        // 2명이면 시간 ×0.6
+    BUILD_SPECIALTY_MULT: 0.67,    // 건설 특기가 있으면 ×0.67
+    WORK_SPECIALTY_BONUS: 0.5,     // 방 근무 특기 효율 +50%
+    STAGE_FRAME_AT: 0.5,           // 공사 진행 50%부터 골조 그림 (그 전은 비계)
+    // use = 전력 소비, perWorker = 근무자 1명당 전력 생산, workers = 근무 최대
+    // specialty = 이 방에서 +50% 효율을 내는 특기 (기획서는 "특기 일 배치 시 +50%"만 정함 → 짝은 여기서 정함)
+    ROOMS: Object.freeze({
+      shaft:     Object.freeze({ w: 1, cost: Object.freeze({ wood: 10 }), sec: 10, use: 0, workers: 0 }),
+      generator: Object.freeze({ w: 2, cost: Object.freeze({ scrap: 25, wood: 10 }), sec: 30, use: 0, perWorker: 6, workers: 2, specialty: 'tech' }),
+      water:     Object.freeze({ w: 2, cost: Object.freeze({ scrap: 15, wood: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'water', perDay: 4 }), specialty: 'tech' }),
+      farm:      Object.freeze({ w: 2, cost: Object.freeze({ wood: 20, scrap: 10 }), sec: 25, use: 3, workers: 2, produce: Object.freeze({ res: 'food', perDay: 4 }), specialty: 'gather' }),
+      quarters:  Object.freeze({ w: 2, cost: Object.freeze({ wood: 20 }), sec: 20, use: 1, workers: 0, popCap: 4 }),
+      storage:   Object.freeze({ w: 1, cost: Object.freeze({ wood: 15 }), sec: 15, use: 0, workers: 0, storageCap: 100 }),
+      workshop:  Object.freeze({ w: 2, cost: Object.freeze({ wood: 20, scrap: 20 }), sec: 30, use: 4, workers: 2, specialty: 'tech' }),
+      guard:     Object.freeze({ w: 1, cost: Object.freeze({ scrap: 20 }), sec: 20, use: 2, workers: 2, dpsPerGuard: 5, specialty: 'combat' }),
+      medbay:    Object.freeze({ w: 2, cost: Object.freeze({ wood: 15, scrap: 15 }), sec: 25, use: 3, workers: 1, healPerDay: 40, specialty: 'tech' }),
+      radio:     Object.freeze({ w: 2, cost: Object.freeze({ scrap: 80, wood: 40, parts: 1 }), sec: 60, use: 10, workers: 1, specialty: 'tech' }),
+    }),
+    BUILD_MENU: Object.freeze(['generator', 'water', 'farm', 'quarters', 'storage', 'workshop', 'guard', 'medbay', 'radio']),
+    // 전력 부족 시 앞쪽이 끝까지 켜져 있다 (뒤쪽부터 꺼짐). turret = 자동 포탑 (M4)
+    POWER_PRIORITY: Object.freeze(['guard', 'turret', 'water', 'farm', 'medbay', 'workshop', 'quarters', 'radio']),
+    // 작업장 제작. 제작 시간은 기획서에 없어 30초(1명 기준)로 정함. 도구·탐사 장비는 효과가 정해지지 않아 보류.
+    CRAFTS: Object.freeze({
+      weapon: Object.freeze({ cost: Object.freeze({ scrap: 15 }), sec: 30 }),
+    }),
+    DOOR_LEVELS: Object.freeze([
+      Object.freeze({ hp: 300 }),
+      Object.freeze({ hp: 600, cost: Object.freeze({ scrap: 40 }) }),
+      Object.freeze({ hp: 1000, cost: Object.freeze({ scrap: 80, wood: 20 }) }),
+    ]),
+  }),
+
+  // 벙커 단면도 그리기 (줌 1 기준 픽셀)
+  BUNKER_VIEW: Object.freeze({
+    CELL_W: 60,
+    CELL_H: 70,
+    SKY_H: 110,                    // 지표면 위 하늘 + 풀 띠
+    GRASS_H: 10,
+    SIDE: 20,                      // 좌우 흙 여백
+    BOTTOM: 30,
+    CACHE_SCALE: 2,
+    FIGURE_HIT_PX: 22,             // 길게 눌러 사람 잡기 반경
+    DIG_PARTICLES_PER_SEC: 14,
+    SPARKLE_COUNT: 24,
+  }),
+  FX: Object.freeze({
+    MAX_PARTICLES: 150,            // 성능 상한
+  }),
 
   // ---------- 지상 (plan.md ① 지상 타일) ----------
   SURFACE: Object.freeze({
@@ -61,8 +123,8 @@ export const CONFIG = Object.freeze({
       box:       Object.freeze({ minRing: 1, oneTime: true, randomReward: Object.freeze({ min: 20, max: 40, pool: Object.freeze(['food', 'water', 'wood', 'scrap']) }) }),
       camp:      Object.freeze({ minRing: 2, oneTime: true, survivors: Object.freeze({ min: 1, max: 2 }) }),
       nest:      Object.freeze({ minRing: 2, powerPerRing: 10, clearReward: Object.freeze({ scrap: 30 }), raidBonus: 2, raidBonusMaxRing: 3 }),
-      // 군 기지: 맵에 1곳 고정, 요구 전투력 45 (plan v0.1 그대로. 3명 최대 전투력과의 관계는 progress.md 메모 참고)
-      base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 45, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
+      // 군 기지: 맵에 1곳 고정, 요구 전투력 35 (plan v0.1.1 — 전투 특기 2 + 일반 1, 전원 무기 = 36)
+      base:      Object.freeze({ minRing: 4, maxRing: 5, count: 1, powerRequired: 35, clearReward: Object.freeze({ parts: 1, scrap: 40 }) }),
     }),
     // 링별 등장 비율 (가중치). 군 기지는 따로 1곳 배치.
     RING_WEIGHTS: Object.freeze({

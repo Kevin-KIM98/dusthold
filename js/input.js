@@ -24,7 +24,8 @@ export function initInput(handlers) {
 
 /**
  * 캔버스 포인터 입력. 좌표는 캔버스 CSS 픽셀 기준.
- * handlers: onTap(x,y), onPan(dx,dy), onZoom(factor, x, y), onLongPress(x,y)
+ * handlers: onTap(x,y), onPan(dx,dy), onZoom(factor, x, y),
+ *           onLongPress(x,y) → true를 돌려주면 끌기 시작: onDragMove(x,y), onDragEnd(x,y), onDragCancel()
  */
 export function initCanvasInput(canvas, handlers) {
   const TC = CONFIG.TOUCH;
@@ -56,11 +57,12 @@ export function initCanvasInput(canvas, handlers) {
       gesture.longTimer = setTimeout(() => {
         if (gesture && !gesture.moved && pts.size === 1) {
           gesture.longFired = true;
-          if (handlers.onLongPress) handlers.onLongPress(gesture.startX, gesture.startY);
+          if (handlers.onLongPress && handlers.onLongPress(gesture.startX, gesture.startY)) gesture.dragging = true;
         }
       }, TC.LONG_PRESS_MS);
     } else if (pts.size === 2 && gesture) {
       clearLong();
+      if (gesture.dragging) { gesture.dragging = false; if (handlers.onDragCancel) handlers.onDragCancel(); }
       gesture.moved = true;
       gesture.pinchDist = dist();
       const m = mid();
@@ -73,6 +75,10 @@ export function initCanvasInput(canvas, handlers) {
     if (!pts.has(e.pointerId) || !gesture) return;
     const p = local(e);
     pts.set(e.pointerId, p);
+    if (pts.size === 1 && gesture.dragging) {
+      handlers.onDragMove(p.x, p.y);
+      return;
+    }
     if (pts.size === 1) {
       if (!gesture.moved && Math.hypot(p.x - gesture.startX, p.y - gesture.startY) > TC.TAP_MAX_PX) {
         gesture.moved = true;
@@ -99,6 +105,12 @@ export function initCanvasInput(canvas, handlers) {
     if (!gesture) return;
     if (pts.size === 0) {
       clearLong();
+      if (gesture.dragging) {
+        if (e.type === 'pointerup') handlers.onDragEnd(p.x, p.y);
+        else if (handlers.onDragCancel) handlers.onDragCancel();
+        gesture = null;
+        return;
+      }
       const quick = performance.now() - gesture.startT <= TC.TAP_MAX_MS;
       if (!gesture.moved && !gesture.longFired && quick && e.type === 'pointerup') handlers.onTap(p.x, p.y);
       gesture = null;

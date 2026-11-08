@@ -16,7 +16,8 @@ export function makeSurvivor(state, rng, specialty) {
     specialty: specialty || rng.pick(SV.SPECIALTIES),
     hp: SV.HP,
     job: 'rest',
-    jobTile: null,
+    jobTile: null,   // 지상 채집·원정 대상 칸
+    jobRef: null,    // 벙커 방·공사 id
     weapon: false,
   };
 }
@@ -41,4 +42,11 @@ export function findSurvivor(state, id) {
 export function setRest(s) {
   s.job = 'rest';
   s.jobTile = null;
+  s.jobRef = null;
+}
+
+/** 이 특기가 맞으면 1.5, 아니면 1 (부상자는 0) */
+export function workEfficiency(s, specialty) {
+  if (isInjured(s)) return 0;
+  return s.specialty === specialty ? 1 + CONFIG.BUNKER.WORK_SPECIALTY_BONUS : 1;
 }

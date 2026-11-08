@@ -10,7 +10,7 @@ test('상단 바는 자원 6종 + 인구 = 7칸, 순서 고정', () => {
   const s = createState(1);
   const bar = topBarModel(s);
   assert.deepEqual(bar.map((i) => i.id), ['food', 'water', 'wood', 'scrap', 'power', 'parts', 'pop']);
-  assert.deepEqual(bar.map((i) => i.text), ['20', '20', '40', '25', '0/0', '0', '4/6']);
+  assert.deepEqual(bar.map((i) => i.text), ['20', '20', '40', '25', '0/3', '0', '4/6'], '전력: 생산 0 / 수요 3 (시작 정수실)');
   assert.deepEqual(bar.map((i) => i.label), ['식량', '물', '목재', '고철', '전력', '통신부품', '인구']);
 });
 
@@ -18,7 +18,7 @@ test('값이 바뀌면 뷰모델도 바뀌고, 부족하면 low 표시', () => {
   const s = createState(1);
   s.resources.wood = 7;
   s.resources.food = 3; // 4명 하루 8 미만 → 부족
-  s.power.consumed = 5;
+  s.power = { produced: 0, consumed: 5, used: 0 };
   const bar = topBarModel(s);
   const by = Object.fromEntries(bar.map((i) => [i.id, i]));
   assert.equal(by.wood.text, '7');
