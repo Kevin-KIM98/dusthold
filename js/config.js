@@ -194,8 +194,7 @@ export const CONFIG = Object.freeze({
     // 둥지 1곳당 +마릿수·적용 링은 SURFACE.TILES.nest(raidBonus, raidBonusMaxRing)
     MAX: 40,
     BIG_EVERY_DAYS: 5,
-    BIG_MULT: 1.5,
-    BIG_MULT_BY_DAY: Object.freeze({ 5: 1.2, 10: 1.2 }),  // 날짜별 대규모 배수 (영주 의견: 5·10일차가 너무 어려움 → 1.5 → 1.2)
+    BIG_MULT: 1.2,                 // 대규모 습격 배수 (v0.7: 영주 의견으로 1.5 → 1.2, 모든 대규모 습격)
   }),
 
   // ---------- 1일차 가이드·연습 습격 (plan v0.3) ----------

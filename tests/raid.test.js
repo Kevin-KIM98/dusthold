@@ -298,9 +298,10 @@ test('⑥ 5일차 습격이 평소의 1.2배 규모다 (v0.6)', () => {
   toNight(s4, 6);
   tick(s4);
   assert.equal(s4.raid.zombies.length, 4 + 2 * 5, '6일차는 다시 평소 공식 (14)');
-  assert.equal(getRaidSize(s, 10), Math.round((4 + 18) * 1.2), '10일차는 1.2배 (v0.5: 영주 의견으로 완화)');
-  assert.equal(getRaidSize(s, 15), Math.min(Math.round((4 + 28) * 1.5), 40), '15일차부터 다시 1.5배 (최대 40)');
-  assert.deepEqual([4, 5, 9, 10, 15].map(bigRaidMult), [1, 1.2, 1, 1.2, 1.5]);
+  assert.equal(getRaidSize(s, 10), Math.round((4 + 18) * 1.2), '10일차도 1.2배');
+  assert.equal(getRaidSize(s, 15), Math.round((4 + 28) * 1.2), '15일차도 1.2배 (38)');
+  assert.equal(getRaidSize(s, 20), 40, '최대 40');
+  assert.deepEqual([4, 5, 9, 10, 15].map(bigRaidMult), [1, 1.2, 1, 1.2, 1.2]);
 });
 
 // ---------- 저장 ----------

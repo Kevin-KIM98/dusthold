@@ -29,17 +29,17 @@ export function activeNestCount(state) {
   return state.surface.tiles.filter((t) => t.type === 'nest' && !t.cleared && t.ring <= NEST.raidBonusMaxRing).length;
 }
 
-/** plan.md ③: min(4 + 2×(일차−1) + 2×(둥지 수), 40), 5의 배수 날 ×1.5. 1일차 밤은 연습 습격 (v0.3) */
+/** plan.md ③: min(4 + 2×(일차−1) + 2×(둥지 수), 40), 5의 배수 날 ×1.2. 1일차 밤은 연습 습격 (v0.3) */
 export function getRaidSize(state, day) {
   if (isPracticeDay(day)) return CONFIG.TUTORIAL.PRACTICE_RAID;
   const base = R.BASE + R.PER_DAY * (day - 1) + NEST.raidBonus * activeNestCount(state);
   return Math.min(Math.round(base * bigRaidMult(day)), R.MAX);
 }
 
-/** 그날 밤 마릿수 배수: 5의 배수 날 = 대규모 (날짜별 배수가 있으면 그것), 아니면 1 */
+/** 그날 밤 마릿수 배수: 5의 배수 날 = 대규모, 아니면 1 */
 export function bigRaidMult(day) {
   if (isPracticeDay(day) || day % R.BIG_EVERY_DAYS !== 0) return 1;
-  return R.BIG_MULT_BY_DAY[day] ?? R.BIG_MULT;
+  return R.BIG_MULT;
 }
 
 /** 연습 습격 날인가 (방폭문이 부서지지 않는다) */
