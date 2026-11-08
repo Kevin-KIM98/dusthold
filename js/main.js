@@ -14,10 +14,12 @@ import { upgradeDoor } from './sim/raid.js';
 import {
   initUI, renderUI, renderPanel, openPanel, showTitle, showGame, setView, closePanel, showToast, setDebug, getCanvas,
   armNewGameConfirm, isNewGameArmed, showOverlay, hideOverlay, isOverlayOpen, initOverlay, applyIconSprites,
+  renderGuide, pulsePanelButtons,
 } from './render/ui.js';
 import { createSurfaceView } from './render/surfaceView.js';
 import { createBunkerView } from './render/bunkerView.js';
-import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText } from './render/viewModel.js';
+import { formatMessage, surfacePanelModel, bunkerPanelModel, reasonText, tutorialModel, tutorialButtons } from './render/viewModel.js';
+import { isTutorialActive, skipTutorial } from './sim/tutorial.js';
 import { initInput, initCanvasInput } from './input.js';
 import { loadSprites, spriteStats } from './render/sprites.js';
 
@@ -78,7 +80,7 @@ function showNextHint() {
     if (btn === 'off') { markHint(HINTS); app.hintQueue.length = 0; } else markHint([id]);
     hideOverlay();
     setPaused(app.state, app.hintPausedBefore);
-    if (id === 'start') queueHint('surface');
+    if (id === 'start' && !isTutorialActive(app.state)) queueHint('surface'); // 가이드가 있으면 가이드가 대신 안내
     showNextHint();
   });
 }
@@ -192,7 +194,7 @@ function changeView(view) {
   app.picker = null;
   setView(view);
   if (view !== 'log') resizeCanvas();
-  if (view === 'bunker') queueHint('bunker');
+  if (view === 'bunker' && app.state && !isTutorialActive(app.state)) queueHint('bunker');
 }
 
 function resizeCanvas() {
@@ -215,11 +217,15 @@ function resizeCanvas() {
   app.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function draw(now) {
+function draw(now, guide) {
   if (app.view === 'log' || app.cssW === 0) return;
+  const tg = guide && guide.target;
   const ctx = app.ctx; // 두 화면 모두 캔버스 전체를 칠하므로 따로 지우지 않는다
-  if (app.view === 'surface') app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now });
-  else app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, paused: app.state.paused });
+  if (app.view === 'surface') {
+    app.surfaceView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.selected, now, guideTile: tg && tg.view === 'surface' ? tg.tile : -1 });
+  } else {
+    app.bunkerView.draw(ctx, app.cssW, app.cssH, app.state, { selected: app.bsel, now, paused: app.state.paused, guideCell: tg && tg.view === 'bunker' ? tg.cell : null });
+  }
 }
 
 function drainEvents() {
@@ -383,9 +389,12 @@ function frame(ts) {
     setDebug(true, t('debug.worst', { fps: Math.round(app.fps), z: app.state.raid.zombies.length, p: fx.count(), cells: occupiedCells(app.state) }));
   } else if (app.debug) setDebug(true, t('debug.fps', { fps: Math.round(app.fps), tick: app.state.time.tick }));
 
-  draw(ts);
+  const guide = app.worst ? null : tutorialModel(app.state);
+  draw(ts, guide);
   renderUI(app.state);
   renderPanel(currentPanelModel());
+  renderGuide(guide, app.view);
+  pulsePanelButtons(guide ? tutorialButtons(guide.step) : []);
   requestAnimationFrame(frame);
 }
 
@@ -400,6 +409,7 @@ const handlers = {
   onClose() { app.picker = null; app.selected = -1; app.bsel = null; closePanel(); },
   onPanelAction,
   onDebug() { toggleWorst(); },
+  onSkipGuide() { if (app.state && skipTutorial(app.state)) { showToast(t('toast.tutorialSkipped')); saveNow(); } },
 };
 
 // ---------- F9 최악 장면 (성능 측정) ----------
@@ -488,7 +498,7 @@ function boot() {
     setPaused: (p) => setPaused(app.state, p),
     stepTicks(n) { for (let i = 0; i < n; i++) tick(app.state); drainEvents(); renderUI(app.state); },
     setTick(v) { app.state.time.tick = v; renderUI(app.state); },
-    render() { draw(performance.now()); renderUI(app.state); renderPanel(currentPanelModel()); },
+    render() { const g = tutorialModel(app.state); draw(performance.now(), g); renderUI(app.state); renderPanel(currentPanelModel()); renderGuide(g, app.view); },
     get selected() { return app.selected; },
     get bsel() { return app.bsel; },
     get camera() { return app.surfaceView && app.surfaceView.camera; },

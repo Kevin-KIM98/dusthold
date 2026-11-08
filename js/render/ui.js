@@ -45,6 +45,9 @@ export function initUI(handlers) {
     b.title = label;
   }
   for (const b of el.tabs) b.textContent = t('tab.' + b.dataset.tab);
+  const skip = document.getElementById('gd-skip');
+  skip.textContent = t('guide.skip');
+  skip.addEventListener('click', () => handlers.onSkipGuide());
 
   // 자원 바 칸 만들기
   el.bar.innerHTML = '';
@@ -188,6 +191,43 @@ export function applyIconSprites() {
     ico.classList.add('ico-img');
     Object.assign(ico.style, css);
   }
+}
+
+// ---------- 1일차 가이드 ----------
+let lastGuideKey = null;
+
+/** model = tutorialModel() 결과 또는 null. view = 지금 화면 */
+export function renderGuide(model, view) {
+  const box = document.getElementById('guide');
+  const stage = document.getElementById('stage');
+  const key = model ? model.title + model.body + model.extra + (model.target ? model.target.view : '') + view : '';
+  if (key === lastGuideKey) return;
+  lastGuideKey = key;
+  for (const b of el.tabs) b.classList.remove('pulse');
+  if (!model || view === 'log') {
+    box.hidden = true;
+    stage.classList.remove('has-guide');
+    if (model && model.target) pulseTab(model.target.view, view);
+    return;
+  }
+  box.hidden = false;
+  stage.classList.add('has-guide');
+  document.getElementById('gd-title').textContent = model.title;
+  document.getElementById('gd-body').textContent = model.body;
+  document.getElementById('gd-extra').textContent = model.extra || '';
+  if (model.target) pulseTab(model.target.view, view);
+}
+
+function pulseTab(want, view) {
+  if (want === view) return;
+  for (const b of el.tabs) if (b.dataset.tab === want) b.classList.add('pulse');
+}
+
+/** 패널 안에서 selectors에 맞는 버튼만 반짝인다 */
+export function pulsePanelButtons(selectors) {
+  const all = el.panelBody.querySelectorAll('button.pulse');
+  for (const b of all) b.classList.remove('pulse');
+  for (const sel of selectors) for (const b of el.panelBody.querySelectorAll(sel)) if (!b.disabled) b.classList.add('pulse');
 }
 
 export function showTitle(hasSave) {

@@ -13,7 +13,7 @@ async function smallButtons(page) {
     .filter((b) => b.w > 0 && (b.w < 44 || b.h < 44)));
 }
 
-test('브라우저: 튜토리얼 힌트 5개 — 순서대로 뜨고, 뜨는 동안 멈추고, 그만 보기', { skip: SKIP, timeout: 120000 }, async () => {
+test('브라우저: 튜토리얼 힌트 — 시작 → (1일차 가이드) → 습격 직전 → 2일차 목표, 뜨는 동안 멈추고, 그만 보기', { skip: SKIP, timeout: 120000 }, async () => {
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -25,17 +25,16 @@ test('브라우저: 튜토리얼 힌트 5개 — 순서대로 뜨고, 뜨는 동
     await page.click('#btn-new');
     await page.waitForSelector('#overlay:not([hidden])');
     assert.equal(await title(), '벙커에 온 걸 환영해요');
+    assert.ok((await page.textContent('#ov-sub')).includes('1일차 가이드'), '시작 힌트가 가이드를 안내');
     assert.equal(await page.evaluate(() => DUSTHOLD.state.paused), true, '힌트가 떠 있으면 멈춤');
     assert.deepEqual(await smallButtons(page), [], '힌트 버튼 44px');
     await page.click('[data-ov="next"]');
-    assert.equal(await title(), '지상: 탐험과 채집', '이어서 지상 힌트');
-    await page.click('[data-ov="next"]');
-    assert.equal(await page.isVisible('#overlay'), false);
+    assert.equal(await page.isVisible('#overlay'), false, '가이드가 있는 동안엔 지상 힌트 대신 가이드 카드');
+    assert.equal(await page.isVisible('#guide'), true);
     assert.equal(await page.evaluate(() => DUSTHOLD.state.paused), false, '닫으면 다시 흐름');
     await page.click('[data-tab="bunker"]');
-    await page.waitForSelector('#overlay:not([hidden])');
-    assert.equal(await title(), '벙커: 전력이 먼저');
-    await page.click('[data-ov="next"]');
+    await nextFrame(page);
+    assert.equal(await page.isVisible('#overlay'), false, '벙커 힌트도 가이드가 대신');
     // 습격 30초 전
     await page.evaluate(() => { DUSTHOLD.setTick(1499); DUSTHOLD.stepTicks(1); });
     await page.waitForSelector('#overlay:not([hidden])');
@@ -47,7 +46,7 @@ test('브라우저: 튜토리얼 힌트 5개 — 순서대로 뜨고, 뜨는 동
     assert.equal(await title(), '목표: 구조 신호');
     await page.click('[data-ov="next"]');
     const seen = await page.evaluate(() => JSON.parse(localStorage.getItem('dusthold.hints.v1')).sort());
-    assert.deepEqual(seen, ['bunker', 'goal', 'raid', 'start', 'surface']);
+    assert.deepEqual(seen, ['goal', 'raid', 'start']);
     // 새로고침 후 새 게임: 다시 안 뜬다
     await page.reload();
     await page.click('#btn-new');

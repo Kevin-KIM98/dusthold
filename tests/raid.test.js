@@ -37,7 +37,8 @@ test('⑥ 밤 시작 시 공식대로의 마릿수가 맵 가장자리에서 입
     toNight(s, day);
     assert.equal(s.raid.active, false, '낮엔 습격 없음');
     tick(s);
-    const expected = Math.min(4 + 2 * (day - 1), 40);
+    // 1일차 밤은 연습 습격 (plan v0.3), 그 뒤로는 공식대로
+    const expected = day <= CONFIG.TUTORIAL.PRACTICE_DAYS ? CONFIG.TUTORIAL.PRACTICE_RAID : Math.min(4 + 2 * (day - 1), 40);
     assert.equal(s.raid.active, true);
     assert.equal(s.raid.zombies.length, expected, `${day}일차: ${expected}마리`);
     // 모두 같은 쪽 가장자리, 맵 바깥에서 시작
@@ -108,14 +109,14 @@ test('좀비 종류: 1~2일차는 일반만, 3일차부터 돌격형, 5일차부
 
 // ---------- ⑥-2 ----------
 test('⑥ 좀비가 방폭문 체력을 깎고, 경비·포탑이 좀비를 처치한다', () => {
-  // 1) 방어 없음: 4마리 × 초당 2 = 초당 8씩 깎인다
+  // 1) 방어 없음 (2일차): 6마리 × 초당 2 = 초당 12씩 깎인다
   const s = noNests(createState(120));
-  toNight(s, 1);
+  toNight(s, 2);
   tick(s);
-  ticks(s, secTicks(RR.APPROACH_SEC + 4 * RR.STAGGER_SEC));
+  ticks(s, secTicks(RR.APPROACH_SEC + 6 * RR.STAGGER_SEC));
   const hp0 = s.door.hp;
   ticks(s, secTicks(10));
-  assert.ok(Math.abs(hp0 - s.door.hp - 80) < 0.5, `10초에 80 감소 (${(hp0 - s.door.hp).toFixed(1)})`);
+  assert.ok(Math.abs(hp0 - s.door.hp - 120) < 0.5, `10초에 120 감소 (${(hp0 - s.door.hp).toFixed(1)})`);
   assert.ok(s.log.some((e) => e.key === 'log.doorHit'), '"방폭문 피해!" 기록');
   assert.equal(s.raid.killed, 0);
 
@@ -134,7 +135,7 @@ test('⑥ 좀비가 방폭문 체력을 깎고, 경비·포탑이 좀비를 처�
   assert.equal(turrets(d)[0].done, true);
   assert.equal(turrets(d)[0].on, true);
   assert.equal(defenseDps(d), 16, '경비 8 + 포탑 8');
-  const day = 1;
+  const day = 2;
   toNight(d, day);
   tick(d);
   const n = d.raid.zombies.length;
@@ -151,9 +152,9 @@ test('방어는 가장 앞(먼저 도착한) 좀비부터 맞힌다', () => {
   power(s, 2);
   const g = debugPlaceRoom(s, 'guard', 2, SC + 1);
   assignWorker(s, s.survivors.find((v) => v.specialty === 'combat').id, g.id);
-  toNight(s, 1);
+  toNight(s, 2);
   tick(s);
-  ticks(s, secTicks(RR.APPROACH_SEC + 4 * RR.STAGGER_SEC));
+  ticks(s, secTicks(RR.APPROACH_SEC + 6 * RR.STAGGER_SEC));
   const atDoor = s.raid.zombies.filter((z) => z.phase === 'door').sort((a, b) => a.order - b.order);
   const hurt = atDoor.filter((z) => z.hp < z.maxHp);
   assert.ok(hurt.length <= 1, '한 번에 한 마리씩');

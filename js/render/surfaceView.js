@@ -184,6 +184,13 @@ export function createSurfaceView() {
       ctx.fillRect(0, 0, w, h);
     }
 
+    // 1일차 가이드가 가리키는 칸 (깜빡이는 테두리, 밤 어둠 위에)
+    if (ui && ui.guideTile >= 0) {
+      const { x, y } = tileXY(n, ui.guideTile);
+      const p = view.worldToScreen(x, y, w, h);
+      drawGuideRing(ctx, p.x, p.y, tp, tp, (ui.now || 0));
+    }
+
     // 좀비 (밤 어둠 위에 그려서 잘 보이게)
     const raid = state.raid;
     if (raid && raid.active) {
@@ -223,6 +230,18 @@ export function drawZombieSprite(ctx, x, y, k, z, face, now) {
     ctx.fillRect(x - bw / 2, y - h - 5 * k, bw * Math.max(0, z.hp / z.maxHp), 2.5 * k);
   }
   return true;
+}
+
+/** 가이드 표시: 깜빡이는 노란 테두리 */
+export function drawGuideRing(ctx, x, y, w, h, now) {
+  const a = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((now / CONFIG.TUTORIAL.PULSE_MS) * Math.PI * 2));
+  ctx.save();
+  ctx.strokeStyle = `rgba(255,213,79,${a})`;
+  ctx.lineWidth = 4;
+  ctx.setLineDash([10, 6]);
+  ctx.lineDashOffset = -now / 40;
+  ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+  ctx.restore();
 }
 
 function drawBadge(ctx, x, y, r, text) {

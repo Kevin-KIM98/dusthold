@@ -10,7 +10,7 @@ import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
 import { drawZombie } from './zombieArt.js';
 import { drawSprite, drawSpriteFeet, drawSpritePart, tileSprite, hasSprite } from './sprites.js';
-import { drawZombieSprite } from './surfaceView.js';
+import { drawZombieSprite, drawGuideRing } from './surfaceView.js';
 
 const V = CONFIG.BUNKER_VIEW;
 const BK = CONFIG.BUNKER;
@@ -263,6 +263,15 @@ export function createBunkerView() {
       ctx.strokeStyle = PAL.selected;
       ctx.lineWidth = 3;
       ctx.strokeRect(p.x - 2, p.y - 2, d.w * zz + 4, d.h * zz + 4);
+    }
+
+    // 1일차 가이드가 가리키는 칸 (방이면 방 전체)
+    if (ui.guideCell) {
+      const gc = ui.guideCell;
+      const room = state.bunker.rooms.find((r) => !roomDef(r.type).attach && r.floor === gc.floor && gc.col >= r.col && gc.col < r.col + r.w);
+      const r0 = cellRect(gc.floor, room ? room.col : gc.col);
+      const p = S(r0.x, r0.y);
+      drawGuideRing(ctx, p.x, p.y, r0.w * (room ? room.w : 1) * zz, r0.h * zz, now);
     }
 
     // 옮기는 중인 사람

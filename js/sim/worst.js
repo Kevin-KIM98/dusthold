@@ -11,6 +11,7 @@ const B = CONFIG.BUNKER;
 
 export function createWorstState() {
   const s = createState(W.SEED);
+  s.tutorial.skipped = true; // 성능 측정엔 가이드 없음
   for (const t of s.surface.tiles) t.revealed = true;
   s.surface.rev++;
   for (let f = 1; f <= B.MAX_FLOORS; f++) {

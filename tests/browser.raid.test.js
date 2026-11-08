@@ -66,14 +66,14 @@ test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파
     assert.ok((await body()).includes('방어 화력 초당 8'));
     assert.equal(await page.textContent('#topbar .res[data-res="power"] .val'), `${GEN * 2}/7`, '포탑 전력 -4');
 
-    // 1일차 밤: 4마리가 가장자리에서 등장 → 입구로
-    await st(() => { DUSTHOLD.setTick(1799); DUSTHOLD.stepTicks(1); });
+    // 2일차 밤 (1일차는 연습 습격): 6마리가 가장자리에서 등장 → 입구로
+    await st(() => { DUSTHOLD.setTick(2400 + 1799); DUSTHOLD.stepTicks(1); });
     await nextFrame(page);
     const raid = await st(() => ({ n: DUSTHOLD.state.raid.zombies.length, edge: DUSTHOLD.state.raid.zombies.every((z) => z.sx < 0 || z.sy < 0 || z.sx > 11 || z.sy > 11) }));
-    assert.deepEqual(raid, { n: 4, edge: true });
-    assert.ok((await page.textContent('#toasts')).includes('좀비 4마리 습격'));
+    assert.deepEqual(raid, { n: 6, edge: true });
+    assert.ok((await page.textContent('#toasts')).includes('좀비 6마리 습격'));
     await tapDoor();
-    assert.ok((await body()).includes('접근 중 4'), await body());
+    assert.ok((await body()).includes('접근 중 6'), await body());
     await st(() => DUSTHOLD.stepTicks(60));
     await page.click('[data-tab="bunker"]');
     await nextFrame(page);
@@ -84,12 +84,12 @@ test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파
     // 포탑이 다 처치
     await st(() => DUSTHOLD.stepTicks(300));
     const after = await st(() => ({ active: DUSTHOLD.state.raid.active, killed: DUSTHOLD.state.raid.killed }));
-    assert.deepEqual(after, { active: false, killed: 4 }, '포탑이 4마리 모두 처치');
+    assert.deepEqual(after, { active: false, killed: 6 }, '포탑이 6마리 모두 처치');
     assert.ok((await page.textContent('#toasts')).includes('습격을 막아냈다'));
 
-    // 2일차 밤: 문이 거의 부서진 상태 → 파괴 → 1층 방 고장
+    // 3일차 밤: 문이 거의 부서진 상태 → 파괴 → 1층 방 고장
     await st(() => { DUSTHOLD.state.bunker.rooms.filter((r) => r.type === 'turret').forEach((r) => { r.broken = true; }); });
-    await st(() => { DUSTHOLD.setTick(2400 + 1799); DUSTHOLD.stepTicks(1); DUSTHOLD.state.door.hp = 1; DUSTHOLD.stepTicks(130); });
+    await st(() => { DUSTHOLD.setTick(2400 * 2 + 1799); DUSTHOLD.stepTicks(1); DUSTHOLD.state.door.hp = 1; DUSTHOLD.stepTicks(130); });
     await nextFrame(page);
     assert.equal(await st(() => DUSTHOLD.state.raid.breached), true);
     await tapDoor();
@@ -117,7 +117,7 @@ test('브라우저: 습격 — 포탑 설치·문 강화·좀비 습격·문 파
     assert.equal(await st(() => DUSTHOLD.state.bunker.rooms.find((r) => r.type === 'generator').broken), false, '수리 완료');
 
     // 새벽: 침입 종료, 전원 -15
-    await st(() => { DUSTHOLD.setTick(2400 * 2 - 1); });
+    await st(() => { DUSTHOLD.setTick(2400 * 3 - 1); });
     const hp0 = await st(() => DUSTHOLD.state.survivors.map((s) => s.hp));
     await st(() => DUSTHOLD.stepTicks(1));
     const hp1 = await st(() => DUSTHOLD.state.survivors.map((s) => s.hp));

@@ -7,6 +7,7 @@ import { step as surfaceStep, onNightStart as surfaceNight } from './surface.js'
 import { step as bunkerStep } from './bunker.js';
 import { step as raidStep, onNightStart as raidNight, onDawn as raidDawn } from './raid.js';
 import { step as economyStep, onDawn as economyDawn, onNightStart as economyNight } from './economy.js';
+import { updateTutorial } from './tutorial.js';
 
 export * from './clock.js';
 
@@ -39,6 +40,7 @@ export function tick(state) {
   surfaceStep(state);
   bunkerStep(state);
   raidStep(state);
+  updateTutorial(state);
   checkOutcome(state);
 }
 

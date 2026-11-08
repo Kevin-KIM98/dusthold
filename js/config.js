@@ -4,7 +4,7 @@
 export const CONFIG = Object.freeze({
   SAVE: Object.freeze({
     KEY: 'dusthold.save.v1',      // localStorage 키
-    VERSION: 5,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구, 5: M5 결과·통계)
+    VERSION: 6,                    // 저장 구조 버전. 구조가 바뀌면 올린다. (2: M2 지상 맵, 3: M3 벙커, 4: M4 습격·도구, 5: M5 결과·통계, 6: 1일차 가이드)
     HINTS_KEY: 'dusthold.hints.v1', // 본 튜토리얼 힌트 (기기별, 저장 파일과 따로)
     AUTOSAVE_INTERVAL_SEC: 10,     // 실시간 기준 자동 저장 주기
   }),
@@ -195,6 +195,16 @@ export const CONFIG = Object.freeze({
     MAX: 40,
     BIG_EVERY_DAYS: 5,
     BIG_MULT: 1.5,
+  }),
+
+  // ---------- 1일차 가이드·연습 습격 (plan v0.3) ----------
+  TUTORIAL: Object.freeze({
+    PRACTICE_DAYS: 1,              // 이 날까지의 밤은 연습 습격
+    PRACTICE_RAID: 2,              // 연습 습격 좀비 수
+    PRACTICE_DOOR_MIN_HP: 1,       // 연습 습격 중 방폭문 체력 최저 (부서지지 않음)
+    DIG_CELL: Object.freeze({ floor: 1, col: 6 }),   // 3·5단계: 정수실 오른쪽 칸 (굴착 → 경비실)
+    EXPLORE_TILE: Object.freeze({ x: 5, y: 3 }),      // 4단계: 입구 바로 위 두 칸째 (항상 탐험 가능)
+    PULSE_MS: 900,                 // 가리키는 곳 깜빡임 주기
   }),
 
   // ---------- 카메라·터치 ----------

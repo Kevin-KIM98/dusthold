@@ -29,11 +29,17 @@ export function activeNestCount(state) {
   return state.surface.tiles.filter((t) => t.type === 'nest' && !t.cleared && t.ring <= NEST.raidBonusMaxRing).length;
 }
 
-/** plan.md ③: min(4 + 2×(일차−1) + 2×(둥지 수), 40), 5의 배수 날 ×1.5 */
+/** plan.md ③: min(4 + 2×(일차−1) + 2×(둥지 수), 40), 5의 배수 날 ×1.5. 1일차 밤은 연습 습격 (v0.3) */
 export function getRaidSize(state, day) {
+  if (isPracticeDay(day)) return CONFIG.TUTORIAL.PRACTICE_RAID;
   const base = R.BASE + R.PER_DAY * (day - 1) + NEST.raidBonus * activeNestCount(state);
   const mult = day % R.BIG_EVERY_DAYS === 0 ? R.BIG_MULT : 1;
   return Math.min(Math.round(base * mult), R.MAX);
+}
+
+/** 연습 습격 날인가 (방폭문이 부서지지 않는다) */
+export function isPracticeDay(day) {
+  return day <= CONFIG.TUTORIAL.PRACTICE_DAYS;
 }
 
 // ---------- 좀비 ----------
@@ -183,6 +189,7 @@ export function step(state) {
         pushEvent(state, 'toast.doorHit', null);
       }
       door.hp -= dps * T.TICK_SEC;
+      if (isPracticeDay(raid.day)) door.hp = Math.max(CONFIG.TUTORIAL.PRACTICE_DOOR_MIN_HP, door.hp); // 연습 습격: 안 부서짐
       if (door.hp <= 0) {
         door.hp = 0;
         raid.breached = true;

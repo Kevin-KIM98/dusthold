@@ -9,6 +9,7 @@ import { generateMap } from './surface.js';
 import { createBunker, createDoor } from './bunker.js';
 import { recomputeGrid } from './economy.js';
 import { createRaid } from './raid.js';
+import { createTutorial, TUTORIAL_STEPS } from './tutorial.js';
 
 export { pushLog, pushEvent };
 
@@ -39,6 +40,7 @@ export function createState(seed) {
     outcome: null,         // null | 'victory' | 'defeat'
     afterVictory: false,   // 클리어 뒤 계속 둘러보기
     stats: { killed: 0, explored: 0, built: 0 },
+    tutorial: createTutorial(),
     log: [],         // { tick, key, params } — 문자열은 strings.js로 바꿔 보여준다
     events: [],      // 한 프레임 안에서 UI(토스트)가 소비하는 임시 이벤트. 저장 안 함.
   };
@@ -121,6 +123,10 @@ export function migrate(raw) {
     // v4(M4) → v5(M5): 결과·통계
     s = { ...s, version: 5, outcome: null, afterVictory: false, stats: { killed: 0, explored: 0, built: 0 } };
   }
+  if (s.version === 5) {
+    // v5 → v6: 1일차 가이드. 이미 하던 게임은 가이드를 끝난 것으로
+    s = { ...s, version: 6, tutorial: { step: TUTORIAL_STEPS.length, done: true, skipped: false } };
+  }
   if (s.version !== CONFIG.SAVE.VERSION) return null;
   return s;
 }
@@ -140,6 +146,7 @@ function isValidState(s) {
     s.door && Number.isFinite(s.door.hp) &&
     s.raid && Array.isArray(s.raid.zombies) &&
     s.stats && typeof s.stats === 'object' &&
+    s.tutorial && typeof s.tutorial.step === 'number' &&
     T.SPEEDS.includes(s.speed) &&
     typeof s.paused === 'boolean'
   );

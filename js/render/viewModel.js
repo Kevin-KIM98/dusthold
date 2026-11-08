@@ -14,6 +14,8 @@ import {
   projectRemainingSec, roomDef, inBounds, turrets, canBuildTurret, canRepair, repairCost,
 } from '../sim/bunker.js';
 import { doorMax, canUpgradeDoor, defenseDps } from '../sim/raid.js';
+import { currentStep, TUTORIAL_STEPS, guardCellFree } from '../sim/tutorial.js';
+import { tileIndex } from '../sim/surface.js';
 import { workerMap } from '../sim/economy.js';
 
 const S = CONFIG.SURFACE;
@@ -383,6 +385,75 @@ export function roomViewState(room) {
   if (room.type === 'shaft') return 'on';
   if (!room.connected) return 'disconnected';
   return room.on ? 'on' : 'off';
+}
+
+// ---------- 1일차 가이드 ----------
+const roomCell = (state, type) => {
+  const r = state.bunker.rooms.find((x) => x.type === type);
+  return r ? { floor: r.floor, col: r.col } : null;
+};
+
+/**
+ * 가이드 카드 내용과 가리킬 곳. 가이드가 끝났거나 건너뛰었으면 null.
+ * target = { view: 'surface', tile } | { view: 'bunker', cell: { floor, col } }
+ */
+export function tutorialModel(state) {
+  const step = currentStep(state);
+  if (!step) return null;
+  const TU = CONFIG.TUTORIAL;
+  const n = state.tutorial.step + 1;
+  const total = TUTORIAL_STEPS.length;
+  let key = 'guide.' + step;
+  let target = null;
+  const extra = [];
+  const anyone = state.survivors.some(isAvailable);
+  switch (step) {
+    case 'gen': target = { view: 'bunker', cell: roomCell(state, 'generator') }; break;
+    case 'water': target = { view: 'bunker', cell: roomCell(state, 'water') }; break;
+    case 'dig': target = { view: 'bunker', cell: { ...TU.DIG_CELL } }; break;
+    case 'explore': {
+      const size = state.surface.size;
+      let tile = tileIndex(size, TU.EXPLORE_TILE.x, TU.EXPLORE_TILE.y);
+      if (!canExplore(state, tile).ok) tile = state.surface.tiles.findIndex((tt, i) => canExplore(state, i).ok);
+      target = tile >= 0 ? { view: 'surface', tile } : null;
+      break;
+    }
+    case 'guard': {
+      const dig = state.bunker.digs.find((d) => d.floor === TU.DIG_CELL.floor && d.col === TU.DIG_CELL.col);
+      if (dig) extra.push(t('guide.waitDig'));
+      if (guardCellFree(state)) target = { view: 'bunker', cell: { ...TU.DIG_CELL } };
+      else key = 'guide.guardAny';
+      break;
+    }
+    case 'guardman': {
+      const g = state.bunker.rooms.find((r) => r.type === 'guard');
+      if (g && !g.done) extra.push(t('guide.waitBuild'));
+      target = g ? { view: 'bunker', cell: { floor: g.floor, col: g.col } } : null;
+      break;
+    }
+    case 'gather': {
+      const tile = state.surface.tiles.findIndex((tt) => tt.type === 'ruins' && tt.revealed && !isDepleted(tt));
+      target = tile >= 0 ? { view: 'surface', tile } : null;
+      if (isNight(state)) extra.push(t('guide.night'));
+      break;
+    }
+    default:
+  }
+  if (!anyone && step !== 'guard' && !extra.length) extra.push(t('guide.noIdle'));
+  return { step, title: t('guide.title', { n, total }), body: t(key), extra: extra.join(' '), target };
+}
+
+/** 지금 단계에서 반짝일 패널 버튼 */
+export function tutorialButtons(step) {
+  return {
+    gen: ['[data-action="addWorker"]', '[data-action="assign"]'],
+    water: ['[data-action="addWorker"]', '[data-action="assign"]'],
+    dig: ['[data-action="dig"]', '[data-action="assign"]'],
+    explore: ['[data-action="explore"]', '[data-action="pick"]', '[data-action="depart"]'],
+    guard: ['[data-action="build"][data-arg="guard"]', '[data-action="assign"]'],
+    guardman: ['[data-action="addWorker"]', '[data-action="assign"]'],
+    gather: ['[data-action="gather"]', '[data-action="assign"]'],
+  }[step] || [];
 }
 
 /** 패널을 다시 그릴지 판단하는 키 */
