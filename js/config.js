@@ -137,6 +137,8 @@ export const CONFIG = Object.freeze({
       Object.freeze([24, 'brute']), Object.freeze([70, 'normal']), Object.freeze([108, 'runner']), Object.freeze([150, 'normal']),
     ]),
     MAX_DPR: 2,
+    ART: 'assets/title.jpg',       // 화면 다듬기 6: 타이틀 그림 (없으면 위 장면을 도형·스프라이트로 그린다)
+    ART_TOP: 0.3,                  // 화면이 그림보다 길 때 남는 높이 중 그림 위쪽에 둘 비율 (나머지는 아래)
   }),
   FX: Object.freeze({
     MAX_PARTICLES: 150,            // 성능 상한
@@ -271,6 +273,7 @@ export const CONFIG = Object.freeze({
     WHEEL_STEP: 0.1,
     CACHE_SCALE: 2,                // 정적 타일 레이어 캐시 해상도 배율
     PAN_MARGIN_TILES: 1,           // 맵 밖으로 끌 수 있는 여유
+    FOG_TEX_TILES: 2.5,            // 이음새 없는 안개 그림 한 장이 덮는 칸 수 (칸마다 같은 무늬로 안 보이게)
   }),
   TOUCH: Object.freeze({
     TAP_MAX_PX: 8,                 // 이보다 적게 움직이면 탭

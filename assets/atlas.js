@@ -7,7 +7,9 @@ export const ATLAS = {
   "parts": "assets/parts.png",
   "people": "assets/people.png",
   "props": "assets/props.png",
-  "icons": "assets/icons.png"
+  "icons": "assets/icons.png",
+  "ui": "assets/ui.png",
+  "fog": "assets/fog.png"
  },
  "sprites": {
   "tile.forest": {
@@ -387,6 +389,55 @@ export const ATLAS = {
    "y": 0,
    "w": 70,
    "h": 64
+  },
+  "ui.barTrack": {
+   "img": "ui",
+   "x": 0,
+   "y": 0,
+   "w": 262,
+   "h": 32
+  },
+  "ui.barFill": {
+   "img": "ui",
+   "x": 264,
+   "y": 0,
+   "w": 323,
+   "h": 32
+  },
+  "ui.barGreen": {
+   "img": "ui",
+   "x": 589,
+   "y": 0,
+   "w": 319,
+   "h": 32
+  },
+  "ui.barYellow": {
+   "img": "ui",
+   "x": 0,
+   "y": 34,
+   "w": 323,
+   "h": 32
+  },
+  "ui.barRed": {
+   "img": "ui",
+   "x": 325,
+   "y": 34,
+   "w": 319,
+   "h": 32
+  },
+  "ui.badge": {
+   "img": "ui",
+   "x": 646,
+   "y": 34,
+   "w": 64,
+   "h": 64
+  },
+  "fog.seamless": {
+   "img": "fog",
+   "x": 0,
+   "y": 0,
+   "w": 256,
+   "h": 256
   }
  }
 };

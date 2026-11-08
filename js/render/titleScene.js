@@ -10,14 +10,49 @@ const T = CONFIG.TITLE_SCENE;
 const V = CONFIG.BUNKER_VIEW;
 const ROOMS = CONFIG.BUNKER.ROOMS;
 
+// 타이틀 그림 한 장: 불러오면 그걸 쓰고, 실패하면 아래 장면 그리기로
+const art = { img: null, failed: false, started: false, canvas: null };
+function loadArt() {
+  if (art.started || typeof Image === 'undefined') return;
+  art.started = true;
+  const img = new Image();
+  img.onload = () => { art.img = img; if (art.canvas) drawTitleScene(art.canvas); };
+  img.onerror = () => { art.failed = true; };
+  img.src = T.ART;
+}
+
+/** 그림을 화면 폭에 맞춰 놓고, 남는 위·아래는 그림 맨 윗줄·아랫줄 색으로 이어 칠한다 */
+function drawArt(ctx, w, h) {
+  const img = art.img;
+  const s = Math.max(w / img.width, Math.min(h / img.height, w / img.width * 1.15)); // 폭 기준 (조금 넘치면 확대해 잘라냄)
+  const dw = img.width * s, dh = img.height * s;
+  const dx = (w - dw) / 2, dy = Math.max(Math.min(0, h - dh), (h - dh) * T.ART_TOP);
+  if (dy > 0) { ctx.drawImage(img, 0, 0, img.width, 1, 0, 0, w, dy + 1); }
+  if (dy + dh < h) { ctx.drawImage(img, 0, img.height - 1, img.width, 1, 0, dy + dh - 1, w, h - dy - dh + 1); }
+  ctx.drawImage(img, dx, dy, dw, dh);
+  // 아래 버튼 자리는 살짝 어둡게
+  const shade = ctx.createLinearGradient(0, h * 0.78, 0, h);
+  shade.addColorStop(0, 'rgba(10,12,14,0)');
+  shade.addColorStop(1, 'rgba(10,12,14,0.7)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, h * 0.78, w, h * 0.22);
+}
+
 /** canvas(CSS 크기 w×h)에 장면을 그린다 */
 export function drawTitleScene(canvas) {
+  art.canvas = canvas;
+  loadArt();
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
   const dpr = Math.min(T.MAX_DPR, window.devicePixelRatio || 1);
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
   const ctx = canvas.getContext('2d');
+  if (art.img) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawArt(ctx, w, h);
+    return;
+  }
   const k = w / T.WORLD_W;                 // 월드 1px → 화면 px
   const hy = h * T.HORIZON;                // 지표면(화면 y)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

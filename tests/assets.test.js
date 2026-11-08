@@ -58,3 +58,16 @@ test('지식재산: 파일 이름·스프라이트 이름에 원작 이름이 �
   const names = [...Object.keys(ATLAS.sprites), ...Object.values(ATLAS.images), ...fs.readdirSync(path.join(ROOT, 'assets'))];
   for (const n of names) assert.ok(!banned.test(n), n);
 });
+
+test('화면 다듬기 6·7·8: 타이틀 그림(JPEG), 진행바·체력바·배지, 이음새 없는 안개', () => {
+  for (const n of ['ui.barTrack', 'ui.barFill', 'ui.barGreen', 'ui.barYellow', 'ui.barRed', 'ui.badge', 'fog.seamless']) assert.ok(ATLAS.sprites[n], n);
+  for (const n of ['ui.barTrack', 'ui.barFill', 'ui.barGreen', 'ui.barYellow', 'ui.barRed']) {
+    const sp = ATLAS.sprites[n];
+    assert.ok(sp.w > sp.h * 4, `${n}: 가로로 긴 막대 (${sp.w}x${sp.h})`);
+  }
+  const fog = ATLAS.sprites['fog.seamless'];
+  assert.equal(fog.w, fog.h, '안개는 정사각형');
+  const jpg = fs.readFileSync(path.join(ROOT, 'assets/title.jpg'));
+  assert.equal(jpg.readUInt16BE(0), 0xffd8, 'JPEG');
+  assert.ok(jpg.length < 400 * 1024, `타이틀 그림 ${Math.round(jpg.length / 1024)}KB`);
+});

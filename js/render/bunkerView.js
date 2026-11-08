@@ -10,7 +10,7 @@ import { getBuildStage, buildersOf, workersOf, roomDef, isDug, turrets, canDig, 
 import { intrusionTarget } from '../sim/raid.js';
 import { createFx } from './fx.js';
 import { drawZombie } from './zombieArt.js';
-import { drawSprite, drawSpriteFeet, drawSpritePart, tileSprite, hasSprite } from './sprites.js';
+import { drawSprite, drawSpriteFeet, drawSpritePart, tileSprite, hasSprite, drawBarSprite } from './sprites.js';
 import { drawZombieSprite, drawGuideRing } from './surfaceView.js';
 
 const V = CONFIG.BUNKER_VIEW;
@@ -357,10 +357,12 @@ function drawSurface(ctx, state, S, zz, now) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; // 부서진 문
     ctx.fillRect(p.x - 6 * zz, p.y - 8 * zz, (d.w + 12) * zz, (d.h + 8) * zz);
   }
-  ctx.fillStyle = PAL.barBg;
-  ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz, 4 * zz);
-  ctx.fillStyle = ratio > 0.5 ? '#6abf4b' : ratio > 0.25 ? '#e0a030' : '#e0504a';
-  ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz * ratio, 4 * zz);
+  if (!drawBarSprite(ctx, p.x, p.y + (d.h - 7) * zz, d.w * zz, 6 * zz, ratio, hpFill(ratio))) {
+    ctx.fillStyle = PAL.barBg;
+    ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz, 4 * zz);
+    ctx.fillStyle = ratio > 0.5 ? '#6abf4b' : ratio > 0.25 ? '#e0a030' : '#e0504a';
+    ctx.fillRect(p.x, p.y + (d.h - 6) * zz, d.w * zz * ratio, 4 * zz);
+  }
   // 자동 포탑 (문 양옆)
   for (const tu of turrets(state)) drawTurret(ctx, state, tu, S, zz, now);
   // 대기 중인 생존자
@@ -646,10 +648,12 @@ function drawTurret(ctx, state, tu, S, zz, now) {
       ctx.strokeRect(p.x, p.y - 6 * k, 12 * k, 20 * k);
       ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = PAL.barBg;
-    ctx.fillRect(p.x, p.y + 16 * k, 12 * k, 3 * k);
-    ctx.fillStyle = PAL.bar;
-    ctx.fillRect(p.x, p.y + 16 * k, 12 * k * tu.progress, 3 * k);
+    if (!drawBarSprite(ctx, p.x - 2 * k, p.y + 15 * k, 16 * k, 5 * k, tu.progress, 'ui.barFill')) {
+      ctx.fillStyle = PAL.barBg;
+      ctx.fillRect(p.x, p.y + 16 * k, 12 * k, 3 * k);
+      ctx.fillStyle = PAL.bar;
+      ctx.fillRect(p.x, p.y + 16 * k, 12 * k * tu.progress, 3 * k);
+    }
     return;
   }
   const dir = left ? -1 : 1;
@@ -707,9 +711,15 @@ function drawLabel(ctx, x, y, zz, text, dim) {
   ctx.fillText(text, bx + pad, by + bh / 2 + 0.5 * zz);
 }
 
+/** 체력 비율 → 막대 색 그림 */
+export function hpFill(ratio) {
+  return ratio > 0.5 ? 'ui.barGreen' : ratio > 0.25 ? 'ui.barYellow' : 'ui.barRed';
+}
+
 function drawBar(ctx, x, y, w, h, zz, p) {
   const bw = w - 12 * zz, bh = 5 * zz;
   const bx = x + 6 * zz, by = y + h - 14 * zz - 22 * zz;
+  if (drawBarSprite(ctx, bx, by - 1 * zz, bw, 7 * zz, p, 'ui.barFill')) return;
   ctx.fillStyle = PAL.barBg;
   ctx.fillRect(bx, by, bw, bh);
   ctx.fillStyle = PAL.bar;

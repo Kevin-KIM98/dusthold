@@ -26,7 +26,7 @@ async function start(browser, opts = {}) {
   return { ctx, page };
 }
 
-test('브라우저: 이미지 54개가 불러와지고 화면에 그려진다 (콘솔 에러 0)', { skip: SKIP, timeout: 120000 }, async () => {
+test('브라우저: 이미지 61개가 불러와지고 화면에 그려진다 (콘솔 에러 0)', { skip: SKIP, timeout: 120000 }, async () => {
   const { server, url } = await serve();
   const browser = await playwright.chromium.launch();
   try {
@@ -34,7 +34,7 @@ test('브라우저: 이미지 54개가 불러와지고 화면에 그려진다 (�
     const errors = collectErrors(page);
     await page.goto(url);
     await page.waitForFunction(() => window.DUSTHOLD && DUSTHOLD.spriteStats().loaded);
-    assert.deepEqual(await page.evaluate(() => DUSTHOLD.spriteStats()), { loaded: true, images: 6, sprites: 54 });
+    assert.deepEqual(await page.evaluate(() => DUSTHOLD.spriteStats()), { loaded: true, images: 8, sprites: 61 });
     await page.click('#btn-new');
     await page.evaluate(() => DUSTHOLD.setPaused(true));
     await sleep(200);

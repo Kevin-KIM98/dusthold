@@ -59,7 +59,22 @@ SHEETS = [
         'names': ['icon.food', 'icon.water', 'icon.wood', 'icon.scrap', 'icon.power',
                   'icon.parts', 'icon.pop', 'icon.injured', 'icon.powerOff', 'icon.warn'],
     },
+    # 화면 다듬기 7: 진행바·체력바(3조각으로 늘려 그림)·인원 배지. 줄마다 하나씩이라 투명 줄 기준으로 나눈다
+    {
+        'key': 'ui', 'file': 'ui_sheet.png', 'cols': 1, 'rows': 6, 'transparent': True, 'split': 'alpha_rows',
+        'height': 32,
+        'names': ['ui.barTrack', 'ui.barFill', 'ui.barGreen', 'ui.barYellow', 'ui.barRed', 'ui.badge'],
+        'heights': {'ui.badge': 64},
+    },
+    # 화면 다듬기 8: 이음새 없는 안개 (지도 위에 이어서 깐다)
+    {
+        'key': 'fog', 'file': 'fog_sheet.png', 'cols': 1, 'rows': 1, 'transparent': False,
+        'size': (256, 256), 'names': ['fog.seamless'], 'seamless': ('fog.seamless',),
+    },
 ]
+
+# 화면 다듬기 6: 타이틀 그림 (아틀라스 밖 한 장, JPEG)
+TITLE = {'file': 'title_art.png', 'out': 'title.jpg', 'quality': 82}
 
 WHITE = 238          # 이보다 밝으면 여백(흰색)으로 본다
 GUTTER_RATIO = 0.96  # 한 줄의 이만큼이 흰색이면 여백 줄
@@ -110,6 +125,21 @@ def cells_transparent(im, cols, rows):
     return boxes
 
 
+def cells_alpha_rows(im, rows):
+    """투명한 줄을 경계로 위에서부터 rows개 그림을 찾는다 (그림 높이가 서로 달라도)"""
+    a = im.split()[-1].point(lambda v: 255 if v >= ALPHA_MIN else 0)
+    w, h = im.size
+    px = a.load()
+    empty = [all(px[x, y] == 0 for x in range(0, w, 2)) for y in range(h)]
+    ys = segments(empty, rows)
+    assert ys, f'투명 줄로 {rows}개를 못 나눔'
+    boxes = []
+    for (y0, y1) in ys:
+        bb = a.crop((0, y0, w, y1)).getbbox()
+        boxes.append((bb[0], y0 + bb[1], bb[2], y0 + bb[3]))
+    return boxes
+
+
 def make_seamless(piece):
     """반 칸 밀어 놓은 같은 그림과 가운데가 진한 마스크로 섞어 가장자리 이음새를 없앤다"""
     w, h = piece.size
@@ -142,7 +172,12 @@ def build(src_dir):
             r, g, b, a = im.split()
             a = a.point(lambda v: 0 if v < HALO_CUT else v)
             im = Image.merge('RGBA', (r, g, b, a))
-        boxes = cells_transparent(im, sh['cols'], sh['rows']) if sh['transparent'] else cells_opaque(im, sh['cols'], sh['rows'])
+        if sh.get('split') == 'alpha_rows':
+            boxes = cells_alpha_rows(im, sh['rows'])
+        elif sh['transparent']:
+            boxes = cells_transparent(im, sh['cols'], sh['rows'])
+        else:
+            boxes = cells_opaque(im, sh['cols'], sh['rows'])
         pieces = []
         for name, box in zip(sh['names'], boxes):
             piece = im.crop(box)
@@ -183,6 +218,10 @@ def build(src_dir):
         f.write('// 이 파일이나 이미지가 없으면 게임은 도형으로 그린다.\n')
         f.write('export const ATLAS = ' + json.dumps(atlas, ensure_ascii=False, indent=1) + ';\n')
     print('assets/atlas.js:', len(atlas['sprites']), '스프라이트')
+    tp = os.path.join(src_dir, TITLE['file'])
+    if os.path.exists(tp):
+        Image.open(tp).convert('RGB').save(os.path.join(OUT, TITLE['out']), quality=TITLE['quality'], optimize=True)
+        print('assets/' + TITLE['out'])
 
 
 if __name__ == '__main__':

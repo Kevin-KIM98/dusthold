@@ -8,7 +8,7 @@ import { drawNightVeil } from './ambience.js';
 import { canExplore, centerIndex, tileXY, isDepleted } from '../sim/surface.js';
 import { zombiePos } from '../sim/raid.js';
 import { drawZombie } from './zombieArt.js';
-import { drawSprite, drawSpriteFeet } from './sprites.js';
+import { drawSprite, drawSpriteFeet, drawBarSprite, hasSprite, tileSprite as fillPattern } from './sprites.js';
 
 const C = CONFIG.CAMERA;
 const PAL = {
@@ -98,11 +98,15 @@ export function createSurfaceView() {
     view.cache.height = n * px;
     const g = view.cache.getContext('2d');
     g.clearRect(0, 0, view.cache.width, view.cache.height);
+    // 안개: 이음새 없는 그림을 지도 전체 기준으로 이어 깐다 (칸마다 같은 무늬 X). 그림이 없으면 칸 그림·도형
+    const fogTex = hasSprite('fog.seamless') ? px * C.FOG_TEX_TILES : 0;
     state.surface.tiles.forEach((tile, i) => {
       const { x, y } = tileXY(n, i);
+      if (!tile.revealed && fogTex) fillPattern(g, 'fog.seamless', x * px, y * px, (x + 1) * px, (y + 1) * px, fogTex, fogTex);
       g.save();
       g.translate(x * px, y * px);
-      drawTile(g, tile, px, tile.revealed ? false : canExplore(state, i).ok || canExplore(state, i).reason === 'reason.busy');
+      const explorable = tile.revealed ? false : canExplore(state, i).ok || canExplore(state, i).reason === 'reason.busy';
+      if (!tile.revealed && fogTex) { if (explorable) drawExplorable(g, px); } else drawTile(g, tile, px, explorable);
       g.restore();
     });
     // 격자
@@ -215,6 +219,7 @@ export function createSurfaceView() {
   return view;
 }
 
+const BADGE_IMG = 1.25; // 배지 그림은 금테가 있어 글자 원보다 조금 크게
 export const ZOMBIE_H = { normal: 26, runner: 24, brute: 38 }; // 줌 1에서 화면 높이(px)
 
 /** 좀비 이미지 + 걷는 흔들림 + 체력 막대. 이미지가 없으면 false */
@@ -222,6 +227,7 @@ export function drawZombieSprite(ctx, x, y, k, z, face, now) {
   const h = ZOMBIE_H[z.type] * k;
   const bob = Math.abs(Math.sin((now + z.id * 97) / (z.type === 'runner' ? 90 : 180))) * 2 * k;
   if (!drawSpriteFeet(ctx, 'zombie.' + z.type, x, y - bob, h, face < 0)) return false;
+  if (z.hp < z.maxHp && drawBarSprite(ctx, x - 8 * k, y - h - 6 * k, 16 * k, 4 * k, z.hp / z.maxHp, 'ui.barRed')) return true;
   if (z.hp < z.maxHp) {
     const bw = 14 * k;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -245,13 +251,15 @@ export function drawGuideRing(ctx, x, y, w, h, now) {
 }
 
 function drawBadge(ctx, x, y, r, text) {
-  ctx.fillStyle = PAL.badge;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = PAL.select;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  if (!drawSprite(ctx, 'ui.badge', x - r * BADGE_IMG, y - r * BADGE_IMG, r * BADGE_IMG * 2, r * BADGE_IMG * 2)) {
+    ctx.fillStyle = PAL.badge;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PAL.select;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
   ctx.fillStyle = PAL.badgeText;
   ctx.font = 'bold ' + Math.round(r * 1.2) + 'px sans-serif';
   ctx.textAlign = 'center';

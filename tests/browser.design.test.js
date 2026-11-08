@@ -33,6 +33,9 @@ for (const noImg of [false, true]) {
         return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2).id;
       });
       assert.equal(hit, 'btn-new', '버튼이 배경 위');
+      // 타이틀 그림을 불러왔는지 (이미지 막으면 장면 그리기로)
+      const artLoaded = await page.evaluate(() => performance.getEntriesByType('resource').some((r) => r.name.endsWith('/assets/title.jpg') && r.responseEnd > 0 && r.transferSize !== undefined));
+      if (!noImg) assert.ok(artLoaded, '타이틀 그림 요청');
 
       // 벙커: 화면을 꽉 채운다 (월드 아래 빈 띠 없음), 7칸 모두 보임
       await page.click('#btn-new');
