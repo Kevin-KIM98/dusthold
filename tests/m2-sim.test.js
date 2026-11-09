@@ -156,7 +156,7 @@ test('모집 패드: 해금마다 궁수 +3, 다음 비용 +4, 궁수 6명이면
   assert.equal(s.commander.coins, left, '닫힌 뒤에는 더 안 들어감');
 });
 
-test('세금 탁자: 3초마다 1개씩(최대 40) 쌓이고, 가까이 가면 전부 가져간다', () => {
+test('세금 탁자: 정해진 간격마다 1개씩(최대 40) 쌓이고, 가까이 가면 전부 가져간다', () => {
   const s = fresh();
   s.unlocked.barracks = true;
   run(s, STILL, 1);
@@ -168,11 +168,12 @@ test('세금 탁자: 3초마다 1개씩(최대 40) 쌓이고, 가까이 가면 �
   assert.ok(table, '세금 탁자 생김');
   place(s, -20, -20); // 멀리 가서 기다리기
   table.stored = 0; table.timer = 0;
-  run(s, STILL, TPS * 3 - 1);
+  const every = Math.round(B.buildings.taxTable.intervalSeconds * TPS);
+  run(s, STILL, every - 1);
   assert.equal(table.stored, 0);
   run(s, STILL, 1);
   assert.equal(table.stored, 1);
-  run(s, STILL, TPS * 3 * 50);
+  run(s, STILL, every * 50);
   assert.equal(table.stored, B.buildings.taxTable.max);
   const before = s.commander.coins;
   place(s, table.x, table.z + table.halfDepth + 1);

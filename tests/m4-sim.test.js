@@ -198,8 +198,9 @@ test('웨이브 5에 거인이 나와, 성주가 옆에 있어도 성벽부터 �
   assert.equal(giant.wave, 5, '웨이브 5의 거인');
   assert.ok(firstHit, '거인이 공격함');
   assert.equal(firstHit.target, 'wall', `거인의 첫 공격 대상: ${firstHit.target}`);
-  // 600짜리 목책은 거인 10대(60×10)에 부서짐
-  run(s, STILL, 25 * TPS);
+  // 목책 체력 ÷ 거인 공격력 만큼 내려치면 부서짐
+  const hitsNeeded = Math.ceil(B.walls.woodHp / B.enemies.types.giant.attack);
+  run(s, STILL, Math.ceil((hitsNeeded + 1) * B.enemies.types.giant.attackInterval * TPS));
   assert.equal(gateOf(s, 'south'), undefined, '거인이 성문을 부숨');
 });
 

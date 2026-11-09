@@ -87,11 +87,12 @@ test('성채 체력이 0이면 패배 화면이 뜬다', { skip }, async () => {
 test('"다시 하기"를 누르면 처음 상태로 돌아간다', { skip }, async () => {
   await page.click('.result .r-again');
   await page.waitForFunction(() => window.__game && window.__game.ready && __game.state.tick < 200, null, { timeout: 20000 });
+  const castleHp = await page.evaluate(() => __game.balance.castle.hp);
   const s = await page.evaluate(() => ({
     result: __game.state.result, buildings: __game.state.buildings.length, walls: __game.state.walls.length,
     coins: __game.state.coins.length, castle: __game.state.castle.hp, wave: __game.state.waves.current, carried: __game.state.commander.coins,
   }));
-  assert.deepEqual(s, { result: null, buildings: 0, walls: 0, coins: 25, castle: 1500, wave: 0, carried: 0 });
+  assert.deepEqual(s, { result: null, buildings: 0, walls: 0, coins: 25, castle: castleHp, wave: 0, carried: 0 });
   assert.equal(await page.$eval('.result', el => el.classList.contains('hidden')), true);
 });
 

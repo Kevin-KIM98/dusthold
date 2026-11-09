@@ -261,7 +261,7 @@
     "taxTable": {
       "halfWidth": 0.8,
       "halfDepth": 0.5,
-      "intervalSeconds": 3,
+      "intervalSeconds": 2,
       "max": 40,
       "collectRadius": 2.0
     },
@@ -274,7 +274,7 @@
   "archers": {
     "maxFollowers": 6,
     "hp": 60,
-    "attack": 8,
+    "attack": 10,
     "attackInterval": 1.0,
     "range": 6,
     "speed": 6.2,
@@ -287,7 +287,7 @@
     "trailStep": 0.3
   },
   "castle": {
-    "hp": 1500
+    "hp": 2500
   },
   "enemies": {
     "aggroRange": 2.0,
@@ -297,7 +297,7 @@
     "types": {
       "raider": {
         "hp": 40,
-        "attack": 5,
+        "attack": 4,
         "attackInterval": 1.0,
         "speed": 1.6,
         "coins": 1,
@@ -306,7 +306,7 @@
       },
       "shield": {
         "hp": 140,
-        "attack": 8,
+        "attack": 6,
         "attackInterval": 1.2,
         "speed": 1.1,
         "coins": 3,
@@ -372,14 +372,14 @@
     "thickness": 0.6,
     "segmentLength": 5.5,
     "gateLength": 3.6,
-    "woodHp": 600,
+    "woodHp": 900,
     "stoneHp": 1500
   },
   "towers": {
     "hp": 500,
     "halfSize": 1.0,
     "archers": 4,
-    "attack": 8,
+    "attack": 10,
     "attackInterval": 1.0,
     "range": 8,
     "upgradeMultiplier": 1.5,
