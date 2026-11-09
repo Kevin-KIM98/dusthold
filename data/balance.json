@@ -1,0 +1,51 @@
+{
+  "sim": {
+    "tickSeconds": 0.05,
+    "maxTicksPerFrame": 8,
+    "fastMultiplier": 4
+  },
+  "map": {
+    "halfSize": 32,
+    "castle": { "x": 0, "z": 0, "halfWidth": 3.5, "halfDepth": 3.5 },
+    "commanderStart": { "x": 0, "z": 6, "angle": 3.14159 },
+    "paths": [
+      { "id": "south", "width": 3, "points": [[0, 32], [3, 22], [-1, 13], [0, 4]] },
+      { "id": "east", "width": 3, "points": [[32, 0], [22, -3], [13, 1], [4, 0]] }
+    ],
+    "trees": {
+      "count": 70, "radius": 0.6, "minScale": 0.8, "maxScale": 1.4,
+      "keepOffPath": 2.5, "keepOffCastle": 11, "minGap": 1.4, "maxTries": 4000
+    },
+    "rocks": {
+      "count": 16, "radius": 0.8, "minScale": 0.7, "maxScale": 1.5,
+      "keepOffPath": 2.5, "keepOffCastle": 9, "minGap": 1.6, "maxTries": 2000
+    }
+  },
+  "commander": {
+    "hp": 300,
+    "radius": 0.5,
+    "speed": 5.5,
+    "turnRate": 14,
+    "inputDeadzone": 0.12
+  },
+  "camera": {
+    "pitchDeg": 55,
+    "yawDeg": 45,
+    "fovDeg": 38,
+    "viewWidth": 17,
+    "viewHeight": 30,
+    "maxDistance": 60,
+    "fogNear": 12,
+    "fogFar": 55,
+    "follow": 6
+  },
+  "joystick": {
+    "radiusPx": 60,
+    "knobPx": 52
+  },
+  "render": {
+    "maxPixelRatio": 2,
+    "shadowMapSize": 2048,
+    "shadowRange": 30
+  }
+}

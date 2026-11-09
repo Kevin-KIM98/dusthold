@@ -2,20 +2,18 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>새 게임 — 준비 중</title>
-<style>
-  html, body { margin: 0; height: 100%; background: #1d2a1f; color: #f3ead2;
-    font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
-  main { height: 100%; display: grid; place-content: center; text-align: center; padding: 0 16px; }
-  h1 { font-size: 28px; margin: 0 0 8px; }
-  p { margin: 0; opacity: .75; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#9fc7d8">
+<title>LASTGATE (가칭)</title>
+<link rel="stylesheet" href="./css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
 </head>
 <body>
-<main>
-  <h1>새 게임 준비 중</h1>
-  <p>곧 여기서 플레이할 수 있어요.</p>
-</main>
+<canvas id="game"></canvas>
+<div id="joy"></div>
+<div id="ui"></div>
+<script type="module" src="./js/main.js"></script>
 </body>
 </html>
