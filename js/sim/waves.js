@@ -1,9 +1,10 @@
 // 적 웨이브 일정·구성 (기획서 ③). 공식은 전부 balance.waves 값으로 계산.
+import { stageScale } from './stages.js';
 
 /** 웨이브 n(1부터)의 일반 병력 수: floor(base + n × perWave), 상한 cap */
-export function waveSize(n, balance) {
+export function waveSize(n, balance, stage = 1) {
   const w = balance.waves;
-  return Math.min(w.cap, Math.floor(w.base + n * w.perWave));
+  return Math.min(w.cap, Math.floor((w.base + n * w.perWave) * stageScale(stage, balance).size));
 }
 
 export function shieldRatio(n, balance) {
@@ -33,8 +34,8 @@ export function wavePathIds(n, balance) {
 }
 
 /** 웨이브 n의 등장 순서: [{ type, pathId }] — 방패병은 고르게 섞고, 거인은 맨 뒤 */
-export function waveComposition(n, balance) {
-  const size = waveSize(n, balance);
+export function waveComposition(n, balance, stage = 1) {
+  const size = waveSize(n, balance, stage);
   const shields = Math.floor(size * shieldRatio(n, balance));
   const paths = wavePathIds(n, balance);
   const list = [];
@@ -48,7 +49,7 @@ export function waveComposition(n, balance) {
 
 export function createWaves() {
   // paused: 테스트·디버그 장면용 (웨이브를 멈춤)
-  return { current: 0, queue: [], paused: false };
+  return { current: 0, queue: [], paused: false, startTick: 0 };
 }
 
 function secondsToTicks(s, balance) { return Math.round(s / balance.sim.tickSeconds); }
@@ -59,12 +60,13 @@ export function updateWaves(state, balance, spawnEnemy) {
   if (w.paused) return;
   const total = balance.waves.total;
   // 이번 틱이 끝나는 시각(tick+1)이 시작 시각에 닿으면 시작
-  if (w.current < total && state.tick + 1 >= secondsToTicks(waveStartSeconds(w.current + 1, balance), balance)) {
+  // 스테이지가 시작된 틱(startTick)부터 잰다
+  if (w.current < total && state.tick + 1 - (w.startTick || 0) >= secondsToTicks(waveStartSeconds(w.current + 1, balance), balance)) {
     w.current += 1;
     const gap = secondsToTicks(balance.waves.spawnGap, balance);
     // 길마다 따로 줄을 세운다 (두 길 동시면 양쪽에서 같이 나옴)
     const perPath = {};
-    for (const e of waveComposition(w.current, balance)) {
+    for (const e of waveComposition(w.current, balance, state.stage)) {
       const k = perPath[e.pathId] = (perPath[e.pathId] ?? -1) + 1;
       w.queue.push({ type: e.type, pathId: e.pathId, at: state.tick + k * gap, wave: w.current });
     }
@@ -84,5 +86,5 @@ export function updateWaves(state, balance, spawnEnemy) {
 export function secondsToNextWave(state, balance) {
   const n = state.waves.current + 1;
   if (n > balance.waves.total) return -1;
-  return Math.max(0, waveStartSeconds(n, balance) - state.time);
+  return Math.max(0, waveStartSeconds(n, balance) - (state.time - (state.waves.startTick || 0) * balance.sim.tickSeconds));
 }

@@ -2,6 +2,7 @@
 import { resolveCollisions } from './commander.js';
 import { pushOutOfBox } from './collision.js';
 import { boxDist } from './walls.js';
+import { stageScale } from './stages.js';
 
 // ── 궁수 ──────────────────────────────────────────────
 export function spawnArchers(state, n, x, z, balance) {
@@ -61,10 +62,12 @@ export function spawnEnemy(state, type, pathId, balance, wave = 0) {
   const t = balance.enemies.types[type];
   const path = state.paths.find(p => p.id === pathId);
   const [x, z] = path.points[0];
+  const sc = stageScale(state.stage, balance); // 스테이지가 오를수록 강해짐
+  const hp = Math.round(t.hp * sc.hp);
   const e = {
     id: state.nextId++, type, pathId, wave, wp: 1,
     x, z, prevX: x, prevZ: z, angle: 0, prevAngle: 0,
-    hp: t.hp, maxHp: t.hp, cooldown: 0, moving: false, attacking: false,
+    hp, maxHp: hp, atk: sc.attack, cooldown: 0, moving: false, attacking: false,
   };
   state.enemies.push(e);
   state.events.push({ type: 'enemySpawn', id: e.id, enemy: type, x, z });

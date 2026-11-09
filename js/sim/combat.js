@@ -90,23 +90,24 @@ export function updateCombat(state, balance) {
     e.attacking = true;
     if (e.cooldown > 0) continue;
     e.cooldown = ticks(t.attackInterval, balance);
+    const dmg = Math.round(t.attack * (e.atk || 1));
     if (hit.kind === 'castle') {
-      state.castle.hp = Math.max(0, state.castle.hp - t.attack);
-      state.events.push({ type: 'hit', target: 'castle', x: e.x, z: e.z, dmg: t.attack });
+      state.castle.hp = Math.max(0, state.castle.hp - dmg);
+      state.events.push({ type: 'hit', target: 'castle', x: e.x, z: e.z, dmg: dmg });
       continue;
     }
     if (hit.kind === 'wall') {
-      hit.obj.hp -= t.attack;
-      state.events.push({ type: 'hit', target: 'wall', id: hit.obj.id, x: hit.px, z: hit.pz, dmg: t.attack });
+      hit.obj.hp -= dmg;
+      state.events.push({ type: 'hit', target: 'wall', id: hit.obj.id, x: hit.px, z: hit.pz, dmg: dmg });
     } else if (!t.splash) {
-      if (hit.kind === 'commander') hurtCommander(state, t.attack, balance);
-      else hurtArcher(state, hit.obj, t.attack);
+      if (hit.kind === 'commander') hurtCommander(state, dmg, balance);
+      else hurtArcher(state, hit.obj, dmg);
     }
     if (t.splash) {
       // 거인: 내려친 자리 주변 splash m 안 아군 모두
       const px = hit.px, pz = hit.pz;
-      if (c.alive && Math.hypot(c.x - px, c.z - pz) <= t.splash) hurtCommander(state, t.attack, balance);
-      for (const a of state.archers) if (Math.hypot(a.x - px, a.z - pz) <= t.splash) hurtArcher(state, a, t.attack);
+      if (c.alive && Math.hypot(c.x - px, c.z - pz) <= t.splash) hurtCommander(state, dmg, balance);
+      for (const a of state.archers) if (Math.hypot(a.x - px, a.z - pz) <= t.splash) hurtArcher(state, a, dmg);
       state.events.push({ type: 'smash', x: px, z: pz });
     }
   }

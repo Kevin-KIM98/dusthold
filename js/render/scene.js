@@ -78,8 +78,11 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
     let payN = 0, pickN = 0;
     for (const e of events) {
       if (e.type === 'pickup') {
-        _a.set(e.x, 0.3, e.z);
-        fx.fly(_a, coinView.stackTop(commander, st.commander.coins, _b), pickN++ * 0.03);
+        const n = Math.min(e.n || 1, 8); // 더미를 주우면 몇 개만 날아가는 연출
+        for (let i = 0; i < n; i++) {
+          _a.set(e.x, 0.3, e.z);
+          fx.fly(_a, coinView.stackTop(commander, st.commander.coins - n + i, _b), pickN++ * 0.03);
+        }
       } else if (e.type === 'pay') {
         const pad = st.pads.find(p => p.id === e.padId);
         for (let i = 0; i < e.n; i++) {

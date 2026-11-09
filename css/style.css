@@ -104,3 +104,6 @@ html, body {
 
 .btn.ghost { background: transparent; border: 2px solid rgba(255,255,255,.5); margin-top: 10px; }
 .resume .r-info { margin: 0 0 14px; font-size: 15px; opacity: .9; }
+
+.wave-s { font-size: 11px; font-weight: 700; color: #ffe27a; }
+.result .r-hint { font-size: 13px; opacity: .85; }

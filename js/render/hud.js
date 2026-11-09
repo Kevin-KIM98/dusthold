@@ -5,7 +5,7 @@ import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
 
 const _v = new THREE.Vector3();
 
-export function createHud(root, balance, { showFps, onPause, onRestart, onNewGame, sound, resumeInfo = null, onResume }) {
+export function createHud(root, balance, { showFps, onPause, onRestart, onNewGame, onNextStage, sound, resumeInfo = null, onResume }) {
   const pauseBtn = document.createElement('button');
   pauseBtn.className = 'ui btn pause';
   pauseBtn.setAttribute('aria-label', STR.pause);
@@ -57,8 +57,9 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
   // 상단 왼쪽: 웨이브 + 다음 웨이브까지 남은 시간 바
   const waveBox = document.createElement('div');
   waveBox.className = 'wave';
-  waveBox.innerHTML = '<div class="wave-n"></div><div class="wave-bar"><i></i></div><div class="wave-t"></div>';
+  waveBox.innerHTML = '<div class="wave-s"></div><div class="wave-n"></div><div class="wave-bar"><i></i></div><div class="wave-t"></div>';
   root.appendChild(waveBox);
+  const waveS = waveBox.querySelector('.wave-s');
   const waveN = waveBox.querySelector('.wave-n'), waveBar = waveBox.querySelector('.wave-bar i'), waveT = waveBox.querySelector('.wave-t');
 
   // 상단 가운데: 성채 체력
@@ -97,9 +98,15 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
   // 승리/패배 화면
   const result = document.createElement('div');
   result.className = 'ui overlay result hidden';
-  result.innerHTML = `<div class="panel"><h2 class="r-title"></h2><p class="r-wave"></p><p class="r-kills"></p><button class="btn wide r-again">${STR.restart}</button></div>`;
+  result.innerHTML = `<div class="panel"><h2 class="r-title"></h2><p class="r-wave"></p><p class="r-kills"></p><p class="r-hint">${STR.nextHint}</p><button class="btn wide r-next">${STR.nextStage}</button><button class="btn wide r-again">${STR.restart}</button></div>`;
   root.appendChild(result);
   result.querySelector('.r-again').addEventListener('click', () => onRestart());
+  result.querySelector('.r-next').addEventListener('click', () => {
+    onNextStage();
+    shown = false;
+    result.classList.add('hidden');
+    pauseBtn.classList.remove('hidden');
+  });
   let shown = false;
 
   const hint = document.createElement('div');
@@ -123,7 +130,7 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
   if (resumeInfo) {
     const box = document.createElement('div');
     box.className = 'ui overlay resume';
-    box.innerHTML = `<div class="panel"><h2>${STR.resumeTitle}</h2><p class="r-info">${STR.resumeInfo(resumeInfo.wave, resumeInfo.coins, Math.max(1, Math.round(resumeInfo.time / 60)))}</p>`
+    box.innerHTML = `<div class="panel"><h2>${STR.resumeTitle}</h2><p class="r-info">${STR.resumeInfo(resumeInfo.stage, resumeInfo.wave, resumeInfo.coins)}</p>`
       + `<button class="btn wide r-go">${STR.continueSave}</button><button class="btn wide ghost r-new">${STR.newGame}</button></div>`;
     root.appendChild(box);
     box.querySelector('.r-go').addEventListener('click', () => { box.remove(); onResume(); });
@@ -142,12 +149,13 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
       }
       const w = innerWidth, h = innerHeight;
       const total = balance.waves.total;
+      waveS.textContent = STR.stage(state.stage || 1);
       waveN.textContent = STR.wave(state.waves.current, total);
       const left = secondsToNextWave(state, balance);
       if (left >= 0) {
         const n = state.waves.current + 1;
         const span = n === 1 ? waveStartSeconds(1, balance) : waveStartSeconds(n, balance) - waveStartSeconds(n - 1, balance);
-        waveBar.style.width = `${(1 - left / span) * 100}%`;
+        waveBar.style.width = `${Math.max(0, 1 - left / span) * 100}%`;
         waveT.textContent = n === 1 ? STR.firstWave(Math.ceil(left)) : STR.nextWave(Math.ceil(left));
       } else {
         waveBar.style.width = '100%';
@@ -158,6 +166,7 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
       for (const e of events) {
         if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target !== 'enemy' ? 'to-ally' : e.by === 'commander' ? 'to-enemy big' : 'to-enemy');
         else if (e.type === 'waveStart') { banner.textContent = STR.waveStart(e.wave); banner.classList.remove('hidden'); bannerT = 2; }
+        else if (e.type === 'stageStart') { banner.textContent = STR.stageStart(e.stage); banner.classList.remove('hidden'); bannerT = 2.5; }
       }
       if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.classList.add('hidden'); }
 
@@ -165,7 +174,12 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
         shown = true;
         const win = state.result === 'win';
         result.classList.toggle('win', win);
-        result.querySelector('.r-title').textContent = win ? STR.win : STR.lose;
+        result.querySelector('.r-title').textContent = win ? STR.stageClear(state.stage || 1) : STR.lose;
+        // 이기면 '다음 판'(+작은 처음부터), 지면 '다시 하기'만
+        result.querySelector('.r-next').style.display = win ? '' : 'none';
+        result.querySelector('.r-hint').style.display = win ? '' : 'none';
+        result.querySelector('.r-again').classList.toggle('ghost', win);
+        result.querySelector('.r-again').textContent = win ? STR.newGame : STR.restart;
         // 버틴 웨이브: 이기면 전부, 지면 무너지기 전까지 끝까지 막아낸 웨이브(= 진행 중이던 웨이브 - 1)
         const held = win ? balance.waves.total : Math.max(0, state.waves.current - 1);
         result.querySelector('.r-wave').textContent = STR.survived(held, balance.waves.total);

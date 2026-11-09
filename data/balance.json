@@ -121,7 +121,7 @@
     "maxPixelRatio": 2,
     "shadowMapSize": 2048,
     "shadowRange": 30,
-    "maxGroundCoins": 200,
+    "maxGroundCoins": 400,
     "coinThickness": 0.07,
     "maxFlyingCoins": 60,
     "flySeconds": 0.35,
@@ -201,13 +201,15 @@
   "coins": {
     "carryMax": 100,
     "pickupRadius": 1.5,
-    "lifetimeSeconds": 20,
     "start": {
       "count": 25,
       "x": 2.5,
       "z": 6.8,
       "spread": 1.2
-    }
+    },
+    "expire": false,
+    "mergeAbove": 120,
+    "mergeRadius": 1.2
   },
   "pads": {
     "payPerSecond": 10,
@@ -470,7 +472,12 @@
     "hideWithin": 1.6
   },
   "save": {
-    "version": 1,
+    "version": 2,
     "intervalSeconds": 3
+  },
+  "stages": {
+    "hpGrowth": 0.35,
+    "attackGrowth": 0.2,
+    "sizeGrowth": 0.25
   }
 }

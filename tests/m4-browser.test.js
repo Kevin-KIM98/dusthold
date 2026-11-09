@@ -102,8 +102,34 @@ test('"다시 하기"를 누르면 처음 상태로 돌아간다', { skip }, asy
 test('웨이브 10의 적을 다 잡으면 승리 화면이 뜬다', { skip }, async () => {
   await page.evaluate(() => { const s = __game.state; s.waves.current = __game.balance.waves.total; s.enemies = []; s.waves.queue = []; });
   await page.waitForSelector('.result:not(.hidden)', { timeout: 5000 });
-  assert.equal(await page.$eval('.result .r-title', el => el.textContent), '승리!');
+  assert.equal(await page.$eval('.result .r-title', el => el.textContent), '스테이지 1 클리어!');
   assert.equal(await page.$eval('.result .r-wave', el => el.textContent), '버틴 웨이브 10/10');
   await page.screenshot({ path: join(ROOT, 'test-results/m4-win.png') });
+  assert.deepEqual(errors, []);
+});
+
+test('클리어 화면에서 "다음 판" → 스테이지 2: 건물·은화 그대로, 웨이브 처음부터, 성채 가득', { skip }, async () => {
+  const before = await page.evaluate(() => {
+    const s = __game.state;
+    s.castle.hp = 100; s.commander.coins = 42;
+    return { built: s.buildings.length, coins: 42 };
+  });
+  await page.click('.result .r-next');
+  await page.waitForFunction(() => __game.state.stage === 2 && !__game.state.result, null, { timeout: 5000 });
+  const after = await page.evaluate(() => ({
+    built: __game.state.buildings.length, coins: __game.state.commander.coins, wave: __game.state.waves.current,
+    castle: __game.state.castle.hp, max: __game.state.castle.maxHp,
+    label: document.querySelector('.wave-s').textContent, waveText: document.querySelector('.wave-n').textContent,
+    hidden: document.querySelector('.result').classList.contains('hidden'),
+  }));
+  assert.equal(after.built, before.built, '건물 그대로');
+  assert.equal(after.coins, before.coins, '은화 그대로');
+  assert.equal(after.wave, 0);
+  assert.equal(after.castle, after.max, '성채 정비');
+  assert.equal(after.label, '스테이지 2');
+  assert.equal(after.waveText, '웨이브 0/10');
+  assert.equal(after.hidden, true, '결과 화면 닫힘');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(ROOT, 'test-results/stage2.png') });
   assert.deepEqual(errors, []);
 });

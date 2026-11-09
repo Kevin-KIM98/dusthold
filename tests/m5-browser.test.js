@@ -96,7 +96,7 @@ test('실제 페이지에서 한 판을 끝까지(자동 플레이) — 결과 �
     console.log(`  페이지 자동 플레이: ${got.result} (웨이브 ${got.wave}) / Node: ${expect.result} (웨이브 ${expect.waves.current})`);
     assert.equal(got.result, expect.result);
     assert.equal(got.wave, expect.waves.current);
-    assert.equal(got.title, expect.result === 'win' ? '승리!' : '성채가 무너졌어요');
+    assert.equal(got.title, expect.result === 'win' ? '스테이지 1 클리어!' : '성채가 무너졌어요');
     assert.deepEqual(g.errors, []);
   } finally { await g.close(); }
 });

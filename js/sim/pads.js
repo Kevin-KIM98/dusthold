@@ -20,7 +20,7 @@ export function refreshPads(state, balance) {
     const reqOk = def.requires.every(r => state.unlocked[r]);
     let open = reqOk && !pad.done;
     if (def.archersPerUse && state.archers.length >= balance.archers.maxFollowers) open = false;
-    if (def.minWave && state.waves.current < def.minWave) open = false;
+    if (def.minWave && (state.stage || 1) < 2 && state.waves.current < def.minWave) open = false; // 스테이지 2부터는 바로
     if (def.upgradeTowers) {
       const towers = state.buildings.filter(b => b.kind === 'tower');
       if (towers.length < (def.minTowers || 1) || !towers.some(b => !b.upgraded)) open = false;

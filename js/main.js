@@ -11,6 +11,7 @@ import { STR } from './strings.js';
 import { createSound } from './audio/sound.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 import { summary } from './sim/save.js';
+import { nextStage } from './sim/stages.js';
 
 const params = new URLSearchParams(location.search);
 const DEFAULT_SEED = 1;
@@ -38,6 +39,7 @@ async function boot() {
   let paused = !!saved; // 이어하기 창에서 고를 때까지 멈춤
   const sound = createSound(balance.sound);
   const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: newGame, onNewGame: newGame, sound,
+    onNextStage: () => { if (nextStage(state, balance)) { for (const e of state.events) events.push(e); ended = false; save(); } },
     resumeInfo: saved ? summary(saved) : null, onResume: () => { paused = false; } });
 
   // 처음부터: 저장을 지우고 새로 불러오기
@@ -47,7 +49,7 @@ async function boot() {
   // 자동 저장: 몇 초마다 + 화면을 떠날 때. 끝난 판은 저장을 지움
   const save = () => {
     if (worst || leaving) return;
-    if (state.result) clearSave();
+    if (state.result === 'lose') clearSave(); // 진 판은 지움, 이긴 판은 저장(다음 접속 때 다음 스테이지로)
     else if (state.tick > 0) writeSave(state, balance);
   };
   let saveAcc = 0;
@@ -95,7 +97,7 @@ async function boot() {
     hud.frame(dt);
     saveAcc += dt;
     if (saveAcc >= balance.save.intervalSeconds && !paused) { saveAcc = 0; save(); }
-    if (state.result && !worst && !ended) { ended = true; clearSave(); }
+    if (state.result && !worst && !ended) { ended = true; save(); }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

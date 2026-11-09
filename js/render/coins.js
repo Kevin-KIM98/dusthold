@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qx = new THREE.Quaternion(), _p = new THREE.Vector3();
+const _pileScale = new THREE.Vector3(1, 1, 1);
 const _one = new THREE.Vector3(1, 1, 1), _up = new THREE.Vector3(0, 1, 0), _ax = new THREE.Vector3(1, 0, 0);
 
 export const COIN_COLOR = 0xf2c84b;
@@ -39,7 +40,8 @@ export function createCoinView(scene, balance) {
         if (c.ttl > 0 && c.ttl < 60 && Math.floor(time * 8) % 2 === 0) continue;
         _q.setFromAxisAngle(_up, time * 3 + c.id).multiply(_qx);
         _p.set(c.x, 0.3 + Math.sin(time * 4 + c.id) * 0.06, c.z);
-        ground.setMatrixAt(n++, _m.compose(_p, _q, _one));
+        const big = c.value > 1 ? 1 + Math.min(1.3, Math.log2(c.value) * 0.3) : 1; // 은화 더미는 크게
+        ground.setMatrixAt(n++, _m.compose(_p, _q, _pileScale.setScalar(big)));
       }
       ground.count = n; ground.instanceMatrix.needsUpdate = true;
 

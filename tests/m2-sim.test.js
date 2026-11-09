@@ -30,7 +30,7 @@ test('시작할 때 은화 25개가 바닥에 있고, 시간이 지나도 사라
   const s = createState(B, 1);
   assert.equal(s.coins.length, B.coins.start.count);
   place(s, -20, -20); // 멀리
-  run(s, STILL, (B.coins.lifetimeSeconds + 5) * TPS);
+  run(s, STILL, 60 * TPS);
   assert.equal(s.coins.length, B.coins.start.count);
 });
 
@@ -65,14 +65,12 @@ test('100개를 넘으면 더 줍지 않는다', () => {
   assert.equal(s.coins.length, 1, '하나는 바닥에 남아야 함');
 });
 
-test('바닥 은화는 20초 뒤 사라진다', () => {
+test('바닥 은화는 주울 때까지 사라지지 않는다 (영주 요청)', () => {
   const s = fresh();
   place(s, -20, -20);
   spawnCoin(s, 0, 14, false, B);
-  run(s, STILL, B.coins.lifetimeSeconds * TPS - 1);
+  run(s, STILL, 300 * TPS); // 5분
   assert.equal(s.coins.length, 1);
-  run(s, STILL, 1);
-  assert.equal(s.coins.length, 0);
 });
 
 test('패드 위에 서 있으면 초당 10개씩 들어가고 패드 남은 비용도 같이 준다', () => {
@@ -250,4 +248,23 @@ test('처음부터 끝까지: 은화 줍기 → 막사 → 세금 탁자 → 모
     return { tick: s.tick, coins: s.commander.coins, x: s.commander.x, z: s.commander.z, route };
   };
   assert.deepEqual(play(), play());
+});
+
+test('바닥 은화가 많으면 가까운 은화와 합쳐 더미가 되고, 주우면 들 수 있는 만큼만 가져간다 (돈은 그대로)', () => {
+  const s = fresh();
+  place(s, -25, -25);
+  const C = B.coins;
+  for (let i = 0; i < C.mergeAbove; i++) spawnCoin(s, -10 + (i % 12) * 2, 10 + Math.floor(i / 12) * 2, false, B);
+  assert.equal(s.coins.length, C.mergeAbove);
+  for (let i = 0; i < 30; i++) spawnCoin(s, 0.1, 10.1, false, B); // 이미 있는 은화(0,10 근처)에 합쳐짐
+  assert.equal(s.coins.length, C.mergeAbove, '개수는 안 늘어남');
+  const total = s.coins.reduce((a, k) => a + (k.value || 1), 0);
+  assert.equal(total, C.mergeAbove + 30, '돈은 하나도 안 사라짐');
+  const pile = s.coins.find(k => k.value > 1);
+  assert.equal(pile.value, 31);
+  s.commander.coins = C.carryMax - 10;
+  place(s, pile.x, pile.z);
+  step(s, STILL, B);
+  assert.equal(s.commander.coins, C.carryMax, '들 수 있는 만큼');
+  assert.ok(s.coins.includes(pile) && pile.value <= 21, '나머지는 바닥에 남음');
 });

@@ -41,6 +41,7 @@ export function createState(balance, seed) {
     walls: [],
     wallLevel: 0,
     result: null,
+    stage: 1,
   };
   scatter(state, map, 'tree', map.trees);
   scatter(state, map, 'rock', map.rocks);
