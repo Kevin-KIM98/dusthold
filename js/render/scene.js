@@ -97,6 +97,10 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
         fx.puff(e.x, e.z, 2);
       } else if (e.type === 'smash') {
         fx.puff(e.x, e.z, 1.5);
+      } else if (e.type === 'throw') {
+        attack.yaw = Math.atan2(e.tx - e.x, e.tz - e.z);
+        attack.start = lastNow;
+        fx.throwAxe(commander.position.x, commander.position.z, e.tx, e.tz);
       } else if (e.type === 'slash') {
         // 성주가 적 쪽으로 몸을 돌리고 칼을 휘두름 + 칼바람
         attack.yaw = Math.atan2(e.tx - e.x, e.tz - e.z);

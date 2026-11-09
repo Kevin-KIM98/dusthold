@@ -97,7 +97,10 @@
     "range": 2.0,
     "respawnSeconds": 5,
     "dropFraction": 0.5,
-    "dropSpread": 1.2
+    "dropSpread": 1.2,
+    "rangedAttack": 18,
+    "rangedInterval": 1.0,
+    "rangedRange": 7
   },
   "camera": {
     "pitchDeg": 55,
@@ -191,7 +194,9 @@
       "grassTileMeters": 7,
       "pathTileMeters": 3
     },
-    "slashSeconds": 0.28
+    "slashSeconds": 0.28,
+    "axeFlightSeconds": 0.3,
+    "maxAxes": 6
   },
   "coins": {
     "carryMax": 100,

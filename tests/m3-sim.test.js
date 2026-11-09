@@ -98,6 +98,7 @@ test('궁수는 사거리(6m) 안 적을 쏘고, 적 체력이 0이면 사라지
   const s = quiet();
   place(s.commander, 0, 20);
   spawnArchers(s, 1, 0, 18.5, B);
+  s.commander.cooldown = 1e9; // 궁수만 보기 (성주 손도끼 제외)
   run(s, STILL, TPS); // 자리 잡기
   const a = s.archers[0];
   const e = spawnEnemy(s, 'raider', 'south', B);
@@ -218,4 +219,22 @@ test('성주 칼 휘두르기 연출: 치켜들었다가 → 앞으로 내려치
   assert.ok(Math.abs(swordAngle(1.6) - SWORD_IDLE) < 1e-9, '제자리');
   // 0.3→0.7 구간에서 계속 앞으로만 움직임
   for (let u = 0.3; u < 0.7; u += 0.05) assert.ok(swordAngle(u + 0.05) > swordAngle(u));
+});
+
+test('성주 원거리: 칼이 안 닿고 사거리 안이면 손도끼(18), 칼이 닿으면 칼 우선, 사거리 밖이면 공격 안 함', () => {
+  const C = B.commander;
+  assert.ok(C.rangedAttack > B.archers.attack && C.rangedRange > B.archers.range, '손도끼가 궁수보다 세고 멀리');
+  assert.ok(C.attack > C.rangedAttack, '칼이 더 셈');
+  const s = quiet();
+  place(s.commander, 0, 20);
+  const e = spawnEnemy(s, 'shield', 'south', B); e.wp = 99;
+  const r = B.enemies.types.shield.radius;
+  const at = (d) => { place(e, d, 20); e.hp = e.maxHp; s.commander.cooldown = 0; step(s, STILL, B); return e.maxHp - e.hp; };
+  // 적이 움직이지 않도록 매번 다시 세우며 한 틱씩
+  assert.equal(at(C.rangedRange + r + 0.5), 0, '사거리 밖');
+  assert.equal(at(C.rangedRange + r - 0.3), C.rangedAttack, '손도끼');
+  assert.ok(s.events.some(ev => ev.type === 'throw'), '던지기 이벤트');
+  assert.equal(s.commander.cooldown, Math.round(C.rangedInterval / B.sim.tickSeconds), '손도끼 대기 시간');
+  assert.equal(at(C.range + r - 0.2), C.attack, '가까우면 칼');
+  assert.ok(s.events.some(ev => ev.type === 'slash'));
 });

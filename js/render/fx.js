@@ -1,6 +1,7 @@
 // 연출: 날아가는 은화 (줍기 → 탑으로, 탑 → 패드로, 세금 탁자 → 탑으로). 게임 규칙과 무관.
 import * as THREE from 'three';
 import { makeCoinGeometry, COIN_COLOR } from './coins.js';
+import { bakeParts, vcMaterial } from './merge.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1);
 
@@ -36,6 +37,17 @@ export function createFx(scene, balance) {
     slashes.push({ m, t: 1 });
   }
   const slashDur = balance.render.slashSeconds * 1.3;
+  // 손도끼: 나무 자루 + 은색 날 (한 덩어리), 날아가며 빙글빙글
+  const axeMax = balance.render.maxAxes, axeDur = balance.render.axeFlightSeconds;
+  const axeGeo = bakeParts([
+    { geo: new THREE.BoxGeometry(0.06, 0.55, 0.06), color: 0x7a4a26 },
+    { geo: new THREE.BoxGeometry(0.06, 0.24, 0.3).translate(0, 0.2, 0.12), color: 0xdfe5ea },
+  ]);
+  const axes = new THREE.InstancedMesh(axeGeo, vcMaterial(), axeMax);
+  axes.count = 0; axes.frustumCulled = false; axes.name = 'axeFx'; axes.castShadow = true;
+  scene.add(axes);
+  const flying = [];
+  const _e = new THREE.Euler();
   let slashNext = 0;
 
   return {
@@ -45,6 +57,10 @@ export function createFx(scene, balance) {
       s.m.position.set(x, 1.15, z);
       s.m.rotation.y = yaw + Math.PI; // 링의 +z 쪽이 앞
       s.m.visible = true;
+    },
+    throwAxe(x, z, tx, tz) {
+      if (flying.length >= axeMax) flying.shift();
+      flying.push({ a: new THREE.Vector3(x, 2.0, z), b: new THREE.Vector3(tx, 0.9, tz), yaw: Math.atan2(tx - x, tz - z), t: 0 });
     },
     shoot(x, z, tx, tz, y = 1.0) {
       if (shots.length >= arrowMax) shots.shift();
@@ -105,6 +121,19 @@ export function createFx(scene, balance) {
         puffs.setMatrixAt(n++, _m.compose(b.p, _q.identity(), _s.set(k, k, k)));
       }
       puffs.count = n; puffs.instanceMatrix.needsUpdate = true;
+
+      n = 0;
+      for (let i = flying.length - 1; i >= 0; i--) {
+        const f = flying[i];
+        f.t += dt;
+        if (f.t >= axeDur) { flying.splice(i, 1); continue; }
+        const u = f.t / axeDur;
+        _p.lerpVectors(f.a, f.b, u);
+        _p.y += Math.sin(u * Math.PI) * 1.4; // 포물선
+        _q.setFromEuler(_e.set(u * Math.PI * 6, f.yaw, 0, 'YXZ')); // 앞으로 빙글빙글
+        axes.setMatrixAt(n++, _m.compose(_p, _q, _s.set(1.3, 1.3, 1.3)));
+      }
+      axes.count = n; axes.instanceMatrix.needsUpdate = true;
 
       for (const s of slashes) {
         if (!s.m.visible) continue;

@@ -26,7 +26,7 @@ export function updateCombat(state, balance) {
   const ccfg = balance.commander, acfg = balance.archers;
   updateRespawn(state, balance); // 쓰러진 틱은 세지 않도록 공격보다 먼저
 
-  // 성주 근접 공격
+  // 성주 공격: 칼이 닿으면 칼(더 셈), 아니면 사거리 안 적에게 손도끼 던지기 (대기 시간은 함께 씀)
   if (c.alive) {
     if (c.cooldown > 0) c.cooldown -= 1;
     if (c.cooldown <= 0) {
@@ -35,6 +35,13 @@ export function updateCombat(state, balance) {
         damageEnemy(state, e, ccfg.attack, balance, 'commander');
         state.events.push({ type: 'slash', x: c.x, z: c.z, tx: e.x, tz: e.z });
         c.cooldown = ticks(ccfg.attackInterval, balance);
+      } else {
+        const far = nearestEnemy(state, c.x, c.z, ccfg.rangedRange, balance);
+        if (far) {
+          damageEnemy(state, far, ccfg.rangedAttack, balance, 'commander');
+          state.events.push({ type: 'throw', x: c.x, z: c.z, tx: far.x, tz: far.z });
+          c.cooldown = ticks(ccfg.rangedInterval, balance);
+        }
       }
     }
   }

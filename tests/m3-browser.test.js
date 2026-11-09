@@ -128,6 +128,33 @@ test('성주가 칼을 휘두르며 공격한다 (칼 움직임·칼바람·큰 
   } finally { await g2.close(); }
 });
 
+test('성주가 멀리 있는 적에게 손도끼를 던진다 (날아가는 도끼·소리·큰 노란 숫자)', { skip }, async () => {
+  const g2 = await openGame('?seed=1');
+  const page = g2.page;
+  try {
+    await page.mouse.click(60, 700); // 소리 켜기용 첫 터치
+    await page.evaluate(async () => {
+      const s = __game.state, c = s.commander;
+      s.waves.paused = true;
+      const { spawnEnemy } = await import('./js/sim/units.js');
+      c.x = c.prevX = 0; c.z = c.prevZ = 18; c.cooldown = 0;
+      const e = spawnEnemy(s, 'shield', 'south', __game.balance);
+      e.x = e.prevX = 4.5; e.z = e.prevZ = 18; e.wp = 99; e.hp = e.maxHp = 1e6;
+      window.__axe = { seen: false, hits: 0, e };
+      const watch = () => {
+        __game.view.scene.traverse(o => { if (o.name === 'axeFx' && o.count > 0) __axe.seen = true; });
+        __axe.hits = 1e6 - e.hp;
+        if (!__axe.done) requestAnimationFrame(watch);
+      };
+      watch();
+    });
+    await page.waitForFunction(() => __axe.seen && __axe.hits > 0, null, { timeout: 20000 });
+    const r = await page.evaluate(() => { __axe.done = true; const h = __axe.hits; __axe.e.hp = 0; return { h, throw: __game.sound.stats().throw, d: __game.balance.commander.rangedAttack }; });
+    assert.equal(r.h % r.d, 0, `손도끼 피해(${r.d})만큼씩 닳음: ${r.h}`);
+    assert.ok(r.throw > 0, '던지는 소리');
+  } finally { await g2.close(); }
+});
+
 test('성주가 쓰러지면 안내가 뜨고 모습이 사라졌다가 5초 뒤 부활한다', { skip }, async () => {
   await page.evaluate(async () => {
     const s = __game.state, c = s.commander;
