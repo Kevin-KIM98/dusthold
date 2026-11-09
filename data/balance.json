@@ -91,7 +91,13 @@
     "radius": 0.5,
     "speed": 5.5,
     "turnRate": 14,
-    "inputDeadzone": 0.12
+    "inputDeadzone": 0.12,
+    "attack": 12,
+    "attackInterval": 0.8,
+    "range": 1.5,
+    "respawnSeconds": 5,
+    "dropFraction": 0.5,
+    "dropSpread": 1.2
   },
   "camera": {
     "pitchDeg": 55,
@@ -115,7 +121,13 @@
     "maxGroundCoins": 200,
     "coinThickness": 0.07,
     "maxFlyingCoins": 60,
-    "flySeconds": 0.35
+    "flySeconds": 0.35,
+    "maxEnemies": 80,
+    "maxArchers": 24,
+    "maxDamageNumbers": 40,
+    "maxArrows": 40,
+    "arrowSeconds": 0.18,
+    "damageNumberSeconds": 0.8
   },
   "coins": {
     "carryMax": 100,
@@ -179,6 +191,98 @@
     }
   },
   "archers": {
-    "maxFollowers": 6
+    "maxFollowers": 6,
+    "hp": 60,
+    "attack": 8,
+    "attackInterval": 1.0,
+    "range": 6,
+    "speed": 6.2,
+    "radius": 0.35,
+    "slotSide": 1.1,
+    "slotBack": 1.5,
+    "slotRow": 1.1,
+    "perRow": 3,
+    "spawnFront": 1.0
+  },
+  "castle": {
+    "hp": 1500
+  },
+  "enemies": {
+    "aggroRange": 2.0,
+    "waypointReach": 0.6,
+    "dropSpread": 0.8,
+    "separation": 0.9,
+    "types": {
+      "raider": {
+        "hp": 40,
+        "attack": 5,
+        "attackInterval": 1.0,
+        "speed": 1.6,
+        "coins": 1,
+        "radius": 0.4,
+        "reach": 0.5
+      },
+      "shield": {
+        "hp": 140,
+        "attack": 8,
+        "attackInterval": 1.2,
+        "speed": 1.1,
+        "coins": 3,
+        "radius": 0.5,
+        "reach": 0.5
+      },
+      "giant": {
+        "hp": 2000,
+        "attack": 60,
+        "attackInterval": 2.0,
+        "speed": 0.8,
+        "coins": 30,
+        "radius": 1.2,
+        "reach": 0.8,
+        "splash": 2.0
+      }
+    }
+  },
+  "waves": {
+    "total": 10,
+    "firstAt": 25,
+    "interval": 35,
+    "lateInterval": 30,
+    "lateFrom": 6,
+    "base": 3,
+    "perWave": 1.5,
+    "cap": 30,
+    "shield": [
+      {
+        "from": 3,
+        "ratio": 0.2
+      },
+      {
+        "from": 7,
+        "ratio": 0.35
+      }
+    ],
+    "bosses": [
+      {
+        "wave": 5,
+        "count": 1
+      },
+      {
+        "wave": 10,
+        "count": 2
+      }
+    ],
+    "bothPathsFrom": 6,
+    "spawnGap": 0.6
+  },
+  "debug": {
+    "worst": {
+      "enemies": 60,
+      "archers": 22,
+      "groundCoins": 150,
+      "carried": 100,
+      "damageNumbers": 40,
+      "radius": 12
+    }
   }
 }

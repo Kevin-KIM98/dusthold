@@ -1,6 +1,7 @@
 // 바닥 패드: 성주가 올라서면 은화가 초당 payPerSecond개씩 들어가고, 다 차면 해금
 import { addBuilding } from './buildings.js';
 import { resolveCollisions } from './commander.js';
+import { spawnArchers } from './units.js';
 
 export function createPads(balance) {
   return balance.pads.list.map(def => ({
@@ -17,7 +18,7 @@ export function refreshPads(state, balance) {
     const def = defOf(balance, pad.id);
     const reqOk = def.requires.every(r => state.unlocked[r]);
     let open = reqOk && !pad.done;
-    if (def.archersPerUse && state.archerCount >= balance.archers.maxFollowers) open = false;
+    if (def.archersPerUse && state.archers.length >= balance.archers.maxFollowers) open = false;
     pad.open = open;
   }
 }
@@ -30,7 +31,7 @@ export function updatePads(state, balance) {
   const c = state.commander;
   const perTick = balance.pads.payPerSecond * balance.sim.tickSeconds;
   for (const pad of state.pads) {
-    if (!pad.open || !isOnPad(pad, c.x, c.z)) { pad.payAcc = 0; continue; }
+    if (!pad.open || !c.alive || !isOnPad(pad, c.x, c.z)) { pad.payAcc = 0; continue; }
     pad.payAcc += perTick;
     const n = Math.floor(pad.payAcc + 1e-9);
     pad.payAcc -= n;
@@ -58,8 +59,11 @@ function unlockPad(state, pad, balance) {
     pad.paid = 0;
     pad.payAcc = 0;
     if (def.archersPerUse) {
-      // M2: 숫자만 늘린다. 실제 궁수 유닛은 M3에서 생성
-      state.archerCount = Math.min(balance.archers.maxFollowers, state.archerCount + def.archersPerUse);
+      // 막사 앞에서 궁수가 나와 성주에게 달려간다
+      const bar = state.buildings.find(b => b.kind === 'barracks');
+      const sx = bar ? bar.x : pad.x;
+      const sz = bar ? bar.z + bar.halfDepth + balance.archers.spawnFront : pad.z;
+      spawnArchers(state, def.archersPerUse, sx, sz, balance);
     }
   } else {
     pad.done = true;

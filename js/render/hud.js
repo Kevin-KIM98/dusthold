@@ -1,10 +1,11 @@
 // 화면 위 UI (일시정지 버튼, 디버그 FPS, 안내 문구)
 import * as THREE from 'three';
 import { STR } from '../strings.js';
+import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
 
 const _v = new THREE.Vector3();
 
-export function createHud(root, { showFps, onPause }) {
+export function createHud(root, balance, { showFps, onPause }) {
   const pauseBtn = document.createElement('button');
   pauseBtn.className = 'ui btn pause';
   pauseBtn.setAttribute('aria-label', STR.pause);
@@ -40,6 +41,46 @@ export function createHud(root, { showFps, onPause }) {
     return el;
   }
 
+  // 상단 왼쪽: 웨이브 + 다음 웨이브까지 남은 시간 바
+  const waveBox = document.createElement('div');
+  waveBox.className = 'wave';
+  waveBox.innerHTML = '<div class="wave-n"></div><div class="wave-bar"><i></i></div><div class="wave-t"></div>';
+  root.appendChild(waveBox);
+  const waveN = waveBox.querySelector('.wave-n'), waveBar = waveBox.querySelector('.wave-bar i'), waveT = waveBox.querySelector('.wave-t');
+
+  // 상단 가운데: 성채 체력
+  const castleBox = document.createElement('div');
+  castleBox.className = 'castle-hp';
+  castleBox.innerHTML = `<span>${STR.castle}</span><div class="hpbar"><i></i></div>`;
+  root.appendChild(castleBox);
+  const castleFill = castleBox.querySelector('i');
+
+  const banner = document.createElement('div');
+  banner.className = 'banner hidden';
+  root.appendChild(banner);
+  let bannerT = 0;
+
+  const downMsg = document.createElement('div');
+  downMsg.className = 'down hidden';
+  root.appendChild(downMsg);
+
+  // 데미지 숫자 (미리 만들어 둔 칸을 돌려 씀)
+  const dmgMax = balance.render.maxDamageNumbers, dmgDur = balance.render.damageNumberSeconds;
+  const dmgPool = [], dmgLive = [];
+  for (let i = 0; i < dmgMax; i++) {
+    const el = document.createElement('div');
+    el.className = 'dmg';
+    el.style.display = 'none';
+    root.appendChild(el);
+    dmgPool.push(el);
+  }
+  const spawnDmg = (x, z, text, cls) => {
+    const el = dmgPool.length ? dmgPool.pop() : dmgLive.shift().el;
+    el.textContent = text;
+    el.className = `dmg ${cls}`;
+    dmgLive.push({ el, x: x + (Math.random() - 0.5) * 0.6, z, t: 0 });
+  };
+
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.textContent = STR.hintMove;
@@ -58,7 +99,7 @@ export function createHud(root, { showFps, onPause }) {
 
   return {
     /** 매 프레임: 은화 수·패드 숫자 갱신 */
-    sync(state, camera) {
+    sync(state, camera, events = [], dt = 0) {
       const k = state.commander.coins;
       if (k !== lastCoins) {
         coinN.textContent = String(k);
@@ -67,6 +108,41 @@ export function createHud(root, { showFps, onPause }) {
         lastCoins = k;
       }
       const w = innerWidth, h = innerHeight;
+      const total = balance.waves.total;
+      waveN.textContent = STR.wave(state.waves.current, total);
+      const left = secondsToNextWave(state, balance);
+      if (left >= 0) {
+        const n = state.waves.current + 1;
+        const span = n === 1 ? waveStartSeconds(1, balance) : waveStartSeconds(n, balance) - waveStartSeconds(n - 1, balance);
+        waveBar.style.width = `${(1 - left / span) * 100}%`;
+        waveT.textContent = n === 1 ? STR.firstWave(Math.ceil(left)) : STR.nextWave(Math.ceil(left));
+      } else {
+        waveBar.style.width = '100%';
+        waveT.textContent = STR.lastWave;
+      }
+      castleFill.style.width = `${state.castle.hp / state.castle.maxHp * 100}%`;
+
+      for (const e of events) {
+        if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target === 'enemy' ? 'to-enemy' : 'to-ally');
+        else if (e.type === 'waveStart') { banner.textContent = STR.waveStart(e.wave); banner.classList.remove('hidden'); bannerT = 2; }
+      }
+      if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.classList.add('hidden'); }
+
+      const c = state.commander;
+      downMsg.classList.toggle('hidden', c.alive);
+      if (!c.alive) downMsg.textContent = STR.down(Math.ceil(c.respawn * balance.sim.tickSeconds));
+
+      for (let i = dmgLive.length - 1; i >= 0; i--) {
+        const d = dmgLive[i];
+        d.t += dt;
+        if (d.t >= dmgDur) { d.el.style.display = 'none'; dmgPool.push(d.el); dmgLive.splice(i, 1); continue; }
+        _v.set(d.x, 1.8 + d.t * 1.5, d.z).project(camera);
+        if (_v.z > 1) { d.el.style.display = 'none'; continue; }
+        d.el.style.display = '';
+        d.el.style.opacity = String(1 - d.t / dmgDur);
+        d.el.style.transform = `translate(${(_v.x + 1) / 2 * w}px, ${(1 - _v.y) / 2 * h}px) translate(-50%, -50%)`;
+      }
+
       for (const pad of state.pads) {
         const el = padLabel(pad.id);
         // 패드 앞쪽 모서리(화면 아래쪽) 밑에 표시 → 패드 위의 성주를 가리지 않음

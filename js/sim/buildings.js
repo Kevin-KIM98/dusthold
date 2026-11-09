@@ -26,7 +26,7 @@ export function updateBuildings(state, balance) {
     } else {
       b.timer = 0;
     }
-    if (b.stored > 0 && Math.hypot(c.x - b.x, c.z - b.z) <= cfg.collectRadius) {
+    if (c.alive && b.stored > 0 && Math.hypot(c.x - b.x, c.z - b.z) <= cfg.collectRadius) {
       const k = Math.min(b.stored, carryMax - c.coins);
       if (k > 0) {
         b.stored -= k;

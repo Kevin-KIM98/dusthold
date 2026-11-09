@@ -6,6 +6,7 @@ import { createCoinView } from './coins.js';
 import { createPadView } from './pads.js';
 import { createBuildingView } from './buildings.js';
 import { createFx } from './fx.js';
+import { createUnitView } from './units.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
@@ -53,6 +54,7 @@ export function createScene(state, balance, canvas) {
   const padView = createPadView(scene, state);
   const buildingView = createBuildingView(scene);
   const fx = createFx(scene, balance);
+  const unitView = createUnitView(scene, balance);
 
   // sim 이벤트 → 날아가는 은화 연출
   function playEvents(st, events) {
@@ -68,6 +70,14 @@ export function createScene(state, balance, canvas) {
           _b.set(pad.x, 0.1, pad.z);
           fx.fly(_a, _b, payN++ * 0.03);
         }
+      } else if (e.type === 'shot') {
+        fx.shoot(e.x, e.z, e.tx, e.tz);
+      } else if (e.type === 'enemyDown') {
+        fx.puff(e.x, e.z, e.enemy === 'giant' ? 2.5 : 1);
+      } else if (e.type === 'archerDown' || e.type === 'commanderDown') {
+        fx.puff(e.x, e.z, 0.8);
+      } else if (e.type === 'smash') {
+        fx.puff(e.x, e.z, 1.5);
       } else if (e.type === 'taxCollect') {
         const n = Math.min(e.n, 15);
         for (let i = 0; i < n; i++) {
@@ -82,18 +92,20 @@ export function createScene(state, balance, canvas) {
     renderer, scene, sun,
     setFog(near, far) { scene.fog.near = near; scene.fog.far = far; },
     /** alpha = 틱 사이 보간 비율(0~1) */
-    sync(st, alpha, focus, events, now, dt) {
+    sync(st, alpha, focus, events, now, dt, camera) {
       const c = st.commander;
       commander.position.set(lerp(c.prevX, c.x, alpha), 0, lerp(c.prevZ, c.z, alpha));
       commander.rotation.y = lerpAngle(c.prevAngle, c.angle, alpha);
       // 걷는 동안 살짝 통통 튀기
       const bob = c.moving ? Math.abs(Math.sin(st.time * 12)) * 0.08 : 0;
       commander.children[0].position.y = bob;
+      commander.visible = c.alive;
       sun.position.set(focus.x, 0, focus.z).add(sunOffset);
       sun.target.position.set(focus.x, 0, focus.z);
       buildingView.sync(st, now);
       padView.sync(st, now);
       coinView.sync(st, commander, now);
+      unitView.sync(st, alpha, now, camera, commander.position);
       if (events.length) playEvents(st, events);
       fx.update(dt);
     },

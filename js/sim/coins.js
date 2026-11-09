@@ -27,7 +27,7 @@ export function updateCoins(state, balance) {
     if (coin.ttl > 0) coin.ttl -= 1;
     if (coin.ttl === 0) continue; // 수명 끝
     const dx = coin.x - c.x, dz = coin.z - c.z;
-    if (c.coins < cfg.carryMax && dx * dx + dz * dz <= r2) {
+    if (c.alive && c.coins < cfg.carryMax && dx * dx + dz * dz <= r2) {
       c.coins += 1;
       state.events.push({ type: 'pickup', x: coin.x, z: coin.z });
       continue;

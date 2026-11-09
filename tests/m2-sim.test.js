@@ -145,11 +145,11 @@ test('모집 패드: 해금마다 궁수 +3, 다음 비용 +4, 궁수 6명이면
   s.commander.coins = 100;
   place(s, rp.x, rp.z);
   run(s, STILL, TPS); // 8개 → 해금 1회
-  assert.equal(s.archerCount, 3);
+  assert.equal(s.archers.length, 3);
   assert.equal(rp.cost, 12);
   assert.equal(rp.paid, 2, '남은 시간 동안 다음 회차에 계속 납부');
   run(s, STILL, TPS * 2);
-  assert.equal(s.archerCount, 6);
+  assert.equal(s.archers.length, 6);
   assert.equal(rp.open, false);
   const left = s.commander.coins;
   run(s, STILL, TPS);
@@ -244,7 +244,7 @@ test('처음부터 끝까지: 은화 줍기 → 막사 → 세금 탁자 → 모
     const rp = pad(s, 'recruit');
     walk(rp.x + 3, rp.z + 2); walk(rp.x, rp.z);
     run(s, STILL, TPS);
-    assert.equal(s.archerCount, 3);
+    assert.equal(s.archers.length, 3);
     return { tick: s.tick, coins: s.commander.coins, x: s.commander.x, z: s.commander.z, route };
   };
   assert.deepEqual(play(), play());

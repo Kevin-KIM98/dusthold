@@ -1,6 +1,7 @@
 // 시작점: 데이터 불러오기 → sim 상태 → 화면·입력 연결 → 고정 타임스텝 루프
 import { createState } from './sim/state.js';
 import { step } from './sim/rules.js';
+import { makeWorstScene } from './sim/debug.js';
 import { createScene } from './render/scene.js';
 import { createFollowCamera } from './render/camera.js';
 import { createHud } from './render/hud.js';
@@ -16,6 +17,7 @@ async function boot() {
   const speed = params.has('fast') ? balance.sim.fastMultiplier : 1;
 
   const state = createState(balance, seed);
+  if (params.has('worst')) makeWorstScene(state, balance);
   const canvas = document.getElementById('game');
   const ui = document.getElementById('ui');
   const view = createScene(state, balance, canvas);
@@ -23,7 +25,7 @@ async function boot() {
   const controls = createControls(canvas, document.getElementById('joy'), balance);
 
   let paused = false;
-  const hud = createHud(ui, { showFps: params.has('worst'), onPause: p => { paused = p; } });
+  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; } });
 
   function resize() {
     view.renderer.setSize(innerWidth, innerHeight, false);
@@ -56,9 +58,9 @@ async function boot() {
     const c = state.commander;
     const fx = c.prevX + (c.x - c.prevX) * alpha, fz = c.prevZ + (c.z - c.prevZ) * alpha;
     cam.update(fx, fz, dt);
-    view.sync(state, alpha, cam.target, events, now / 1000, dt);
+    view.sync(state, alpha, cam.target, events, now / 1000, dt, cam.camera);
+    hud.sync(state, cam.camera, events, dt);
     events.length = 0;
-    hud.sync(state, cam.camera);
     view.renderer.render(view.scene, cam.camera);
     hud.frame(dt);
     requestAnimationFrame(frame);

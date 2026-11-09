@@ -8,5 +8,12 @@ export const STR = {
   fps: 'FPS',
   coinsLabel: '들고 있는 은화',
   pads: { barracks: '궁수 막사', recruit: '궁수 모집', taxTable: '세금 탁자' },
+  wave: (n, total) => `웨이브 ${n}/${total}`,
+  nextWave: s => `다음 ${s}초`,
+  firstWave: s => `적이 와요 ${s}초`,
+  lastWave: '마지막 웨이브',
+  waveStart: n => `웨이브 ${n} 시작!`,
+  castle: '성채',
+  down: s => `쓰러졌어요! ${s}초 뒤 부활`,
   hintMove: '화면을 누르고 끌어서 이동 · PC는 WASD',
 };

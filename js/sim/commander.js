@@ -7,6 +7,7 @@ export function moveCommander(state, input, balance) {
   const cfg = balance.commander;
   const dt = balance.sim.tickSeconds;
   c.prevX = c.x; c.prevZ = c.z; c.prevAngle = c.angle;
+  if (!c.alive) { c.moving = false; return; }
 
   let ix = input ? input.x : 0, iz = input ? input.z : 0;
   let mag = Math.hypot(ix, iz);

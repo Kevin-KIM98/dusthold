@@ -3,6 +3,7 @@ import { createRng, range } from './rng.js';
 import { distToPolyline } from './collision.js';
 import { spawnStartCoins } from './coins.js';
 import { createPads, refreshPads } from './pads.js';
+import { createWaves } from './waves.js';
 
 export function createState(balance, seed) {
   const map = balance.map;
@@ -19,8 +20,11 @@ export function createState(balance, seed) {
       hp: balance.commander.hp,
       moving: false,
       coins: 0,
+      alive: true,
+      respawn: 0,
+      cooldown: 0,
     },
-    castle: { ...map.castle },
+    castle: { ...map.castle, hp: balance.castle.hp, maxHp: balance.castle.hp },
     paths: map.paths.map(p => ({ id: p.id, width: p.width, points: p.points.map(pt => [pt[0], pt[1]]) })),
     obstacles: [],
     nextId: 1,
@@ -29,7 +33,10 @@ export function createState(balance, seed) {
     pads: createPads(balance),
     buildings: [],
     unlocked: {},
-    archerCount: 0,
+    archers: [],
+    enemies: [],
+    waves: createWaves(),
+    kills: 0,
   };
   scatter(state, map, 'tree', map.trees);
   scatter(state, map, 'rock', map.rocks);

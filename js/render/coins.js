@@ -44,7 +44,7 @@ export function createCoinView(scene, balance) {
       ground.count = n; ground.instanceMatrix.needsUpdate = true;
 
       // 등 뒤 탑: 걸을 때 살짝 휘청
-      const k = state.commander.coins;
+      const k = state.commander.alive ? state.commander.coins : 0;
       const a = cmd.rotation.y, sx = Math.sin(a), cz = Math.cos(a);
       const sway = state.commander.moving ? Math.sin(time * 10) * 0.004 : 0;
       _q.setFromAxisAngle(_up, a);
