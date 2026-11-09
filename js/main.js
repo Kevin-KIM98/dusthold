@@ -9,6 +9,8 @@ import { createHud } from './render/hud.js';
 import { createControls } from './input/controls.js';
 import { STR } from './strings.js';
 import { createSound } from './audio/sound.js';
+import { loadSave, writeSave, clearSave } from './storage.js';
+import { summary } from './sim/save.js';
 
 const params = new URLSearchParams(location.search);
 const DEFAULT_SEED = 1;
@@ -18,8 +20,11 @@ async function boot() {
   const seed = params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED;
   const speed = params.has('fast') ? balance.sim.fastMultiplier : 1;
 
-  const state = createState(balance, seed);
-  if (params.has('worst')) makeWorstScene(state, balance);
+  // 이어하기: 이 브라우저에 저장된 판이 있으면 그 상태로 시작 (?worst 디버그 장면은 저장·불러오기 안 함)
+  const worst = params.has('worst');
+  const saved = worst ? null : loadSave(balance);
+  const state = saved || createState(balance, seed);
+  if (worst) makeWorstScene(state, balance);
   const canvas = document.getElementById('game');
   const ui = document.getElementById('ui');
   // M6 아트: ?noart = 도형만, ?assets=다른목록.json = 다른 아트 목록
@@ -30,9 +35,24 @@ async function boot() {
   const cam = createFollowCamera(balance.camera, innerWidth / innerHeight);
   const controls = createControls(canvas, document.getElementById('joy'), balance);
 
-  let paused = false;
+  let paused = !!saved; // 이어하기 창에서 고를 때까지 멈춤
   const sound = createSound(balance.sound);
-  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: () => location.reload(), sound });
+  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: newGame, onNewGame: newGame, sound,
+    resumeInfo: saved ? summary(saved) : null, onResume: () => { paused = false; } });
+
+  // 처음부터: 저장을 지우고 새로 불러오기
+  // (떠나면서 자동 저장이 옛 판을 다시 쓰지 않도록 leaving 표시)
+  let leaving = false;
+  function newGame() { leaving = true; clearSave(); location.reload(); }
+  // 자동 저장: 몇 초마다 + 화면을 떠날 때. 끝난 판은 저장을 지움
+  const save = () => {
+    if (worst || leaving) return;
+    if (state.result) clearSave();
+    else if (state.tick > 0) writeSave(state, balance);
+  };
+  let saveAcc = 0;
+  addEventListener('pagehide', save);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
 
   function resize() {
     view.renderer.setSize(innerWidth, innerHeight, false);
@@ -45,6 +65,7 @@ async function boot() {
   const TICK = balance.sim.tickSeconds;
   let acc = 0, last = performance.now(), lastInput = { x: 0, z: 0 };
   const events = []; // 이번 프레임에 sim에서 나온 이벤트 모음 (연출용)
+  let ended = false;
 
   function frame(now) {
     const dt = Math.min(0.25, (now - last) / 1000);
@@ -72,12 +93,15 @@ async function boot() {
     events.length = 0;
     view.renderer.render(view.scene, cam.camera);
     hud.frame(dt);
+    saveAcc += dt;
+    if (saveAcc >= balance.save.intervalSeconds && !paused) { saveAcc = 0; save(); }
+    if (state.result && !worst && !ended) { ended = true; clearSave(); }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   // 디버그·테스트용 (게임 규칙에는 영향 없음)
-  window.__game = { state, balance, camera: cam, view, sound, art: art.report, isPaused: () => paused, ready: true, inputOverride: null };
+  window.__game = { state, balance, camera: cam, view, sound, art: art.report, isPaused: () => paused, ready: true, inputOverride: null, saveNow: save, resumed: !!saved };
 }
 
 boot().catch(err => {

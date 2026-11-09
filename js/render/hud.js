@@ -5,7 +5,7 @@ import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
 
 const _v = new THREE.Vector3();
 
-export function createHud(root, balance, { showFps, onPause, onRestart, sound }) {
+export function createHud(root, balance, { showFps, onPause, onRestart, onNewGame, sound, resumeInfo = null, onResume }) {
   const pauseBtn = document.createElement('button');
   pauseBtn.className = 'ui btn pause';
   pauseBtn.setAttribute('aria-label', STR.pause);
@@ -27,7 +27,7 @@ export function createHud(root, balance, { showFps, onPause, onRestart, sound })
 
   const overlay = document.createElement('div');
   overlay.className = 'ui overlay hidden';
-  overlay.innerHTML = `<div class="panel"><h2>${STR.paused}</h2><button class="btn wide">${STR.resume}</button></div>`;
+  overlay.innerHTML = `<div class="panel"><h2>${STR.paused}</h2><button class="btn wide p-go">${STR.resume}</button><button class="btn wide ghost p-new">${STR.newGame}</button></div>`;
   root.appendChild(overlay);
 
   // 상단 오른쪽: 들고 있는 은화 수
@@ -116,7 +116,19 @@ export function createHud(root, balance, { showFps, onPause, onRestart, sound })
 
   const setPaused = p => { overlay.classList.toggle('hidden', !p); onPause(p); };
   pauseBtn.addEventListener('click', () => setPaused(true));
-  overlay.querySelector('button').addEventListener('click', () => setPaused(false));
+  overlay.querySelector('.p-go').addEventListener('click', () => setPaused(false));
+  overlay.querySelector('.p-new').addEventListener('click', () => onNewGame());
+
+  // 다시 접속했을 때: 이어서 하기 / 처음부터
+  if (resumeInfo) {
+    const box = document.createElement('div');
+    box.className = 'ui overlay resume';
+    box.innerHTML = `<div class="panel"><h2>${STR.resumeTitle}</h2><p class="r-info">${STR.resumeInfo(resumeInfo.wave, resumeInfo.coins, Math.max(1, Math.round(resumeInfo.time / 60)))}</p>`
+      + `<button class="btn wide r-go">${STR.continueSave}</button><button class="btn wide ghost r-new">${STR.newGame}</button></div>`;
+    root.appendChild(box);
+    box.querySelector('.r-go').addEventListener('click', () => { box.remove(); onResume(); });
+    box.querySelector('.r-new').addEventListener('click', () => onNewGame());
+  }
 
   return {
     /** 매 프레임: 은화 수·패드 숫자 갱신 */

@@ -48,8 +48,8 @@
 
 ```
 index.html  css/  data/balance.json  vendor/three/
-js/main.js  js/strings.js
-js/sim/      state · rng · commander · coins · pads · units · combat · waves · rules
+js/main.js  js/strings.js  js/storage.js (이어하기: 이 브라우저에만 저장)
+js/sim/      state · rng · commander · coins · pads · units · combat · waves · rules · save
 js/render/   scene · camera · instanced · hud · fx
 js/input/    joystick · keyboard · controls
 js/audio/    sound (Web Audio 합성 효과음)

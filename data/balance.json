@@ -468,5 +468,9 @@
     "arrowStart": 1.4,
     "maxArrows": 14,
     "hideWithin": 1.6
+  },
+  "save": {
+    "version": 1,
+    "intervalSeconds": 3
   }
 }

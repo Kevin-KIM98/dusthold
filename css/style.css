@@ -101,3 +101,6 @@ html, body {
 .result p { margin: 0 0 8px; font-size: 16px; }
 .result .r-again { margin-top: 12px; }
 .dmg.big { color: #ffd84a; font-size: 24px; }
+
+.btn.ghost { background: transparent; border: 2px solid rgba(255,255,255,.5); margin-top: 10px; }
+.resume .r-info { margin: 0 0 14px; font-size: 15px; opacity: .9; }
