@@ -1,0 +1,25 @@
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
+
+# 테스트 산출물
+test-results/
+*.log
+
+# Unity (unity/ 폴더, U1 단계부터 사용)
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]ser[Ss]ettings/
+unity/[Mm]emoryCaptures/
+unity/*.csproj
+unity/*.sln
+unity/*.apk
+unity/*.aab
+unity/.vs/

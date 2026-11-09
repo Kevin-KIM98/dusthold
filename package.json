@@ -1,0 +1,11 @@
+{
+  "name": "lastgate",
+  "version": "0.0.1",
+  "private": true,
+  "description": "LASTGATE (가칭) — 브라우저 프로토타입 (빌드 도구·런타임 패키지 없음, Three.js는 vendor/)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8000"
+  }
+}
