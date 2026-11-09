@@ -6,19 +6,84 @@
   },
   "map": {
     "halfSize": 32,
-    "castle": { "x": 0, "z": 0, "halfWidth": 3.5, "halfDepth": 3.5 },
-    "commanderStart": { "x": 0, "z": 6, "angle": 3.14159 },
+    "castle": {
+      "x": 0,
+      "z": 0,
+      "halfWidth": 3.5,
+      "halfDepth": 3.5
+    },
+    "commanderStart": {
+      "x": 0,
+      "z": 6,
+      "angle": 3.14159
+    },
     "paths": [
-      { "id": "south", "width": 3, "points": [[0, 32], [3, 22], [-1, 13], [0, 4]] },
-      { "id": "east", "width": 3, "points": [[32, 0], [22, -3], [13, 1], [4, 0]] }
+      {
+        "id": "south",
+        "width": 3,
+        "points": [
+          [
+            0,
+            32
+          ],
+          [
+            3,
+            22
+          ],
+          [
+            -1,
+            13
+          ],
+          [
+            0,
+            4
+          ]
+        ]
+      },
+      {
+        "id": "east",
+        "width": 3,
+        "points": [
+          [
+            32,
+            0
+          ],
+          [
+            22,
+            -3
+          ],
+          [
+            13,
+            1
+          ],
+          [
+            4,
+            0
+          ]
+        ]
+      }
     ],
     "trees": {
-      "count": 70, "radius": 0.6, "minScale": 0.8, "maxScale": 1.4,
-      "keepOffPath": 2.5, "keepOffCastle": 11, "minGap": 1.4, "maxTries": 4000
+      "count": 70,
+      "radius": 0.6,
+      "minScale": 0.8,
+      "maxScale": 1.4,
+      "keepOffPath": 2.5,
+      "keepOffCastle": 11,
+      "minGap": 1.4,
+      "maxTries": 4000,
+      "keepOffPad": 3
     },
     "rocks": {
-      "count": 16, "radius": 0.8, "minScale": 0.7, "maxScale": 1.5,
-      "keepOffPath": 2.5, "keepOffCastle": 9, "minGap": 1.6, "maxTries": 2000
+      "count": 16,
+      "radius": 0.8,
+      "minScale": 0.7,
+      "maxScale": 1.5,
+      "keepOffPath": 2.5,
+      "keepOffCastle": 9,
+      "minGap": 1.6,
+      "maxTries": 2000,
+      "keepOffPad": 3
     }
   },
   "commander": {
@@ -46,6 +111,74 @@
   "render": {
     "maxPixelRatio": 2,
     "shadowMapSize": 2048,
-    "shadowRange": 30
+    "shadowRange": 30,
+    "maxGroundCoins": 200,
+    "coinThickness": 0.07,
+    "maxFlyingCoins": 60,
+    "flySeconds": 0.35
+  },
+  "coins": {
+    "carryMax": 100,
+    "pickupRadius": 1.5,
+    "lifetimeSeconds": 20,
+    "start": {
+      "count": 25,
+      "x": 3,
+      "z": 10,
+      "spread": 1.2
+    }
+  },
+  "pads": {
+    "payPerSecond": 10,
+    "halfSize": 1.0,
+    "list": [
+      {
+        "id": "barracks",
+        "x": -7,
+        "z": 3,
+        "cost": 6,
+        "requires": [],
+        "builds": "barracks"
+      },
+      {
+        "id": "recruit",
+        "x": -7,
+        "z": 7.2,
+        "cost": 8,
+        "costStep": 4,
+        "requires": [
+          "barracks"
+        ],
+        "repeat": true,
+        "archersPerUse": 3
+      },
+      {
+        "id": "taxTable",
+        "x": 6.5,
+        "z": 6.5,
+        "cost": 15,
+        "requires": [
+          "barracks"
+        ],
+        "builds": "taxTable"
+      }
+    ]
+  },
+  "buildings": {
+    "barracks": {
+      "hp": 400,
+      "halfWidth": 1.6,
+      "halfDepth": 1.3
+    },
+    "taxTable": {
+      "halfWidth": 0.8,
+      "halfDepth": 0.5,
+      "intervalSeconds": 3,
+      "max": 40,
+      "collectRadius": 2.0
+    }
+  },
+  "archers": {
+    "maxFollowers": 6
   }
 }

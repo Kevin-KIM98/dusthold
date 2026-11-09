@@ -35,6 +35,7 @@ async function boot() {
 
   const TICK = balance.sim.tickSeconds;
   let acc = 0, last = performance.now(), lastInput = { x: 0, z: 0 };
+  const events = []; // 이번 프레임에 sim에서 나온 이벤트 모음 (연출용)
 
   function frame(now) {
     const dt = Math.min(0.25, (now - last) / 1000);
@@ -46,6 +47,7 @@ async function boot() {
         lastInput = controls.read();
         if (lastInput.x || lastInput.z) hud.hideHint();
         step(state, lastInput, balance);
+        for (const e of state.events) events.push(e);
         acc -= TICK; n++;
       }
       if (n === balance.sim.maxTicksPerFrame) acc = 0;
@@ -54,7 +56,9 @@ async function boot() {
     const c = state.commander;
     const fx = c.prevX + (c.x - c.prevX) * alpha, fz = c.prevZ + (c.z - c.prevZ) * alpha;
     cam.update(fx, fz, dt);
-    view.sync(state, alpha, cam.target);
+    view.sync(state, alpha, cam.target, events, now / 1000, dt);
+    events.length = 0;
+    hud.sync(state, cam.camera);
     view.renderer.render(view.scene, cam.camera);
     hud.frame(dt);
     requestAnimationFrame(frame);

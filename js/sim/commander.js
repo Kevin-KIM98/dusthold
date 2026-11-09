@@ -21,10 +21,11 @@ export function moveCommander(state, input, balance) {
   resolveCollisions(state, c, cfg.radius, balance.map.halfSize);
 }
 
-/** 나무·바위·성채·맵 경계와 겹치지 않게 밀어낸다 */
+/** 나무·바위·성채·건물·맵 경계와 겹치지 않게 밀어낸다 */
 export function resolveCollisions(state, body, r, halfSize) {
   for (let pass = 0; pass < 3; pass++) {
     let hit = pushOutOfBox(body, r, state.castle);
+    for (const b of state.buildings) hit = pushOutOfBox(body, r, b) || hit;
     for (const o of state.obstacles) hit = pushOutOfCircle(body, r, o) || hit;
     clampToBounds(body, r, halfSize);
     if (!hit) break;

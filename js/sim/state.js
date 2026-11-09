@@ -1,6 +1,8 @@
 // 게임 상태 만들기. 상태는 숫자·문자열·배열·평범한 객체만 담는다.
 import { createRng, range } from './rng.js';
 import { distToPolyline } from './collision.js';
+import { spawnStartCoins } from './coins.js';
+import { createPads, refreshPads } from './pads.js';
 
 export function createState(balance, seed) {
   const map = balance.map;
@@ -16,13 +18,23 @@ export function createState(balance, seed) {
       prevX: start.x, prevZ: start.z, prevAngle: start.angle,
       hp: balance.commander.hp,
       moving: false,
+      coins: 0,
     },
     castle: { ...map.castle },
     paths: map.paths.map(p => ({ id: p.id, width: p.width, points: p.points.map(pt => [pt[0], pt[1]]) })),
     obstacles: [],
+    nextId: 1,
+    events: [],
+    coins: [],
+    pads: createPads(balance),
+    buildings: [],
+    unlocked: {},
+    archerCount: 0,
   };
   scatter(state, map, 'tree', map.trees);
   scatter(state, map, 'rock', map.rocks);
+  spawnStartCoins(state, balance);
+  refreshPads(state, balance);
   return state;
 }
 
@@ -41,6 +53,10 @@ function scatter(state, map, kind, cfg) {
     let ok = true;
     for (const p of state.paths) {
       if (distToPolyline(x, z, p.points) < p.width / 2 + cfg.keepOffPath + r) { ok = false; break; }
+    }
+    if (!ok) continue;
+    for (const p of state.pads) {
+      if (Math.hypot(x - p.x, z - p.z) < p.half * Math.SQRT2 + cfg.keepOffPad + r) { ok = false; break; }
     }
     if (!ok) continue;
     for (const o of state.obstacles) {

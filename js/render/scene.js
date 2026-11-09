@@ -2,6 +2,12 @@
 // sim 상태는 읽기만 한다.
 import * as THREE from 'three';
 import { makeInstanced } from './instanced.js';
+import { createCoinView } from './coins.js';
+import { createPadView } from './pads.js';
+import { createBuildingView } from './buildings.js';
+import { createFx } from './fx.js';
+
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
 const COLORS = {
   sky: 0x9fc7d8, grass: 0x6f9e4c, grassDark: 0x4d7536, path: 0xcfb07a,
@@ -43,12 +49,40 @@ export function createScene(state, balance, canvas) {
   buildObstacles(scene, state.obstacles);
   const commander = buildCommander();
   scene.add(commander);
+  const coinView = createCoinView(scene, balance);
+  const padView = createPadView(scene, state);
+  const buildingView = createBuildingView(scene);
+  const fx = createFx(scene, balance);
+
+  // sim 이벤트 → 날아가는 은화 연출
+  function playEvents(st, events) {
+    let payN = 0, pickN = 0;
+    for (const e of events) {
+      if (e.type === 'pickup') {
+        _a.set(e.x, 0.3, e.z);
+        fx.fly(_a, coinView.stackTop(commander, st.commander.coins, _b), pickN++ * 0.03);
+      } else if (e.type === 'pay') {
+        const pad = st.pads.find(p => p.id === e.padId);
+        for (let i = 0; i < e.n; i++) {
+          coinView.stackTop(commander, st.commander.coins + i, _a);
+          _b.set(pad.x, 0.1, pad.z);
+          fx.fly(_a, _b, payN++ * 0.03);
+        }
+      } else if (e.type === 'taxCollect') {
+        const n = Math.min(e.n, 15);
+        for (let i = 0; i < n; i++) {
+          _a.set(e.x, 0.9, e.z);
+          fx.fly(_a, coinView.stackTop(commander, st.commander.coins - n + i, _b), i * 0.03);
+        }
+      }
+    }
+  }
 
   return {
     renderer, scene, sun,
     setFog(near, far) { scene.fog.near = near; scene.fog.far = far; },
     /** alpha = 틱 사이 보간 비율(0~1) */
-    sync(st, alpha, focus) {
+    sync(st, alpha, focus, events, now, dt) {
       const c = st.commander;
       commander.position.set(lerp(c.prevX, c.x, alpha), 0, lerp(c.prevZ, c.z, alpha));
       commander.rotation.y = lerpAngle(c.prevAngle, c.angle, alpha);
@@ -57,6 +91,11 @@ export function createScene(state, balance, canvas) {
       commander.children[0].position.y = bob;
       sun.position.set(focus.x, 0, focus.z).add(sunOffset);
       sun.target.position.set(focus.x, 0, focus.z);
+      buildingView.sync(st, now);
+      padView.sync(st, now);
+      coinView.sync(st, commander, now);
+      if (events.length) playEvents(st, events);
+      fx.update(dt);
     },
     commanderObject: commander,
   };
@@ -187,9 +226,8 @@ function buildCommander() {
   add(new THREE.CylinderGeometry(0.2, 0.26, 0.6, 8), mat(COLORS.tunic), 0, 1.25, -0.05);
   add(new THREE.SphereGeometry(0.19, 10, 8), mat(COLORS.skin), 0, 1.7, -0.02);
   add(new THREE.ConeGeometry(0.22, 0.32, 8), mat(COLORS.helm), 0, 1.92, -0.02);
-  // 등 뒤 깃발 (은화 탑이 쌓일 자리 표시 겸)
-  add(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5), mat(COLORS.gate), 0, 1.6, -0.35);
-  add(new THREE.BoxGeometry(0.03, 0.3, 0.4), mat(COLORS.flag), 0, 1.95, -0.55);
+  // 등 뒤 안장 받침 (은화 탑이 여기 쌓인다)
+  add(new THREE.BoxGeometry(0.4, 0.08, 0.4), mat(COLORS.gate), 0, 0.98, -0.6);
   root.scale.setScalar(COMMANDER_SCALE);
   return root;
 }

@@ -1,48 +1,21 @@
 // M1 화면 테스트 (헤드리스 브라우저). Playwright가 없는 환경에서는 건너뛴다.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { join, extname, normalize } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { ROOT } from './helpers.js';
+import { skip, openGame } from './browser.js';
 
-let chromium = null;
-try { chromium = createRequire(import.meta.url)('playwright').chromium; } catch { /* 없음 */ }
-const skip = chromium ? false : 'playwright 없음';
-
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css' };
-let server, base, browser, page, cdp;
-const errors = [];
+let game, page, cdp, errors;
 
 before(async () => {
   if (skip) return;
-  server = createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://x');
-    const rel = normalize(decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)).replace(/^([/\\])+/, '');
-    try {
-      const body = await readFile(join(ROOT, rel));
-      res.writeHead(200, { 'content-type': TYPES[extname(rel)] || 'application/octet-stream' });
-      res.end(body);
-    } catch { res.writeHead(404); res.end(); }
-  });
-  await new Promise(r => server.listen(0, '127.0.0.1', r));
-  base = `http://127.0.0.1:${server.address().port}/`;
-  browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
-  page = await ctx.newPage();
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', e => errors.push(String(e)));
-  await page.goto(base + '?seed=1');
-  await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 20000 });
-  await page.waitForTimeout(800);
-  cdp = await ctx.newCDPSession(page);
+  game = await openGame('?seed=1');
+  ({ page, errors } = game);
+  cdp = await game.ctx.newCDPSession(page);
 });
 
-after(async () => {
-  if (browser) await browser.close();
-  if (server) server.close();
-});
+after(async () => { if (game) await game.close(); });
 
 const pos = () => page.evaluate(() => ({ x: __game.state.commander.x, z: __game.state.commander.z }));
 const resetTo = (x, z) => page.evaluate(([x, z]) => {
