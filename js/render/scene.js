@@ -15,9 +15,9 @@ import { buildGrassGround, buildScatter, hash2 } from './decor.js';
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
 const COLORS = {
-  sky: 0xa9d3e6, path: 0xd9bd86, pathEdge: 0x977850,
-  stone: 0xc9c1b0, stoneDark: 0x9a917f, stoneDeep: 0x7d7566, roof: 0x3d67b0, roofDark: 0x2f5293,
-  gate: 0x4a3524, window: 0x2b2a33, banner: 0x2f5fa8, gold: 0xe8bb3f,
+  sky: 0xa9d3e6, path: 0xd9bd86, pathEdge: 0xa88a5e,
+  stone: 0xdcdad3, stoneDark: 0xbdbab1, stoneDeep: 0x9c9990, roof: 0x4f9be0, roofDark: 0x3a7fc4,
+  gate: 0x4a3524, window: 0x2b2a33, banner: 0x4a8fd8, gold: 0xf2c23e,
   trunk: 0x6b4a2f, pine: 0x2f6e3a, pine2: 0x3f8746, leafRound: 0x4f9a3e, leafRound2: 0x66ad4a, rock: 0x9a958c, rock2: 0x86827a,
   wool: 0xf5f1e6, woolShade: 0xe3ddcf, sheepFace: 0x3a3330, hoof: 0x24201d, horn: 0xdcb45a,
   tunic: 0x2f5fa8, cape: 0xb8332c, belt: 0x6b4423, skin: 0xedc099, helm: 0xc9cfd6, plume: 0xd8402f, saddle: 0x9c2f2a,
@@ -35,7 +35,7 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   renderer.shadowMap.type = THREE.PCFShadowMap;
   // 색이 너무 바래지 않는 톤 매핑 + 살짝 밝게
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.1;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.sky);
@@ -54,7 +54,7 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   scene.add(sun, sun.target);
 
   buildGround(scene, balance, art);
-  buildPaths(scene, state.paths, art);
+  buildPaths(scene, state.paths, art, balance.render.art.pathTileMeters);
   buildCastle(scene, state.castle, art);
   buildObstacles(scene, state.obstacles, art);
   buildScatter(scene, state, balance);
@@ -129,35 +129,16 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   };
 }
 
-/** 텍스처가 있으면 반복 무늬로, 없으면 단색 */
-function texturedMat(art, name, color, repeat) {
-  const t = art.textures[name];
-  if (!t) return new THREE.MeshLambertMaterial({ color });
-  const tex = t.texture.clone();
-  tex.repeat.set(repeat * t.repeat, repeat * t.repeat);
-  tex.needsUpdate = true;
-  return new THREE.MeshLambertMaterial({ map: tex });
-}
-
 function buildGround(scene, balance, art) {
-  const map = balance.map;
-  if (!art.textures.grass) { buildGrassGround(scene, map, balance.walls.half); return; }
-  const size = map.halfSize * 2;
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 4, size * 4), new THREE.MeshLambertMaterial({ color: 0x3f6b30 }));
-  outer.rotation.x = -Math.PI / 2;
-  outer.position.y = -0.02;
-  scene.add(outer);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), texturedMat(art, 'grass', 0x6f9e4c, size / 8));
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  const g = art.textures.grass;
+  buildGrassGround(scene, balance.map, balance.walls.half, g ? g.texture : null, balance.render.art.grassTileMeters * (g ? g.repeat : 1));
 }
 
-function buildPaths(scene, paths, art) {
+function buildPaths(scene, paths, art, tileM = 3) {
   const mat = art.textures.path
-    ? new THREE.MeshLambertMaterial({ map: art.textures.path.texture, side: THREE.DoubleSide })
+    ? new THREE.MeshLambertMaterial({ map: art.textures.path.texture, side: THREE.DoubleSide, color: 0xf4ead8 })
     : new THREE.MeshLambertMaterial({ color: COLORS.path, side: THREE.DoubleSide });
-  const uvScale = art.textures.path ? 1 / (4 * art.textures.path.repeat) : 0.25;
+  const uvScale = art.textures.path ? 1 / (4 * art.textures.path.repeat) : 0.25; // 아래 UV 계산에서 ×4 → repeat 반영
   const edgeMat = new THREE.MeshLambertMaterial({ color: COLORS.pathEdge, side: THREE.DoubleSide });
   // 가장자리 띠를 먼저(조금 넓고 낮게), 그 위에 길
   for (const [list, m, y] of [[paths.map(p => ({ ...p, width: p.width + 1.0 })), edgeMat, 0.008], [paths, mat, 0.016]]) for (const p of list) {
@@ -185,8 +166,22 @@ function buildPaths(scene, paths, art) {
     for (const pt of p.points) addDisc(pt);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    // UV: u = 길을 따라 간 거리, v = 길 가운데서 옆으로 떨어진 거리 (가장 가까운 선분 기준)
+    const cum = [0];
+    for (let i = 1; i < p.points.length; i++) cum.push(cum[i - 1] + Math.hypot(p.points[i][0] - p.points[i - 1][0], p.points[i][1] - p.points[i - 1][1]));
     const uv = [];
-    for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * uvScale, pos[i + 2] * uvScale);
+    for (let i = 0; i < pos.length; i += 3) {
+      const x = pos[i], z = pos[i + 2];
+      let best = Infinity, along = 0, across = 0;
+      for (let k = 0; k + 1 < p.points.length; k++) {
+        const [ax, az] = p.points[k], [bx, bz] = p.points[k + 1];
+        const dx = bx - ax, dz = bz - az, len = Math.hypot(dx, dz) || 1;
+        const t = Math.max(0, Math.min(len, ((x - ax) * dx + (z - az) * dz) / len));
+        const px = ax + dx / len * t, pz = az + dz / len * t, d = Math.hypot(x - px, z - pz);
+        if (d < best - 1e-6) { best = d; along = cum[k] + t; across = ((x - ax) * dz - (z - az) * dx) / len; }
+      }
+      uv.push(along / tileM * uvScale * 4, 0.5 + across / tileM * uvScale * 4);
+    }
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     g.computeVertexNormals();

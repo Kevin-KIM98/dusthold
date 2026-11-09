@@ -187,7 +187,9 @@
         "tower": {
           "width": 2.2
         }
-      }
+      },
+      "grassTileMeters": 7,
+      "pathTileMeters": 3
     }
   },
   "coins": {

@@ -19,10 +19,11 @@ export function noise2(x, z) {
 
 const GRASS_A = new THREE.Color(0x6aa548), GRASS_B = new THREE.Color(0x4f8a3a), GRASS_C = new THREE.Color(0x8fb85a);
 const TRODDEN = new THREE.Color(0x9aa760);
-const _c = new THREE.Color();
+const _c = new THREE.Color(), _t = new THREE.Color();
 
 /** 꼭짓점 색으로 얼룩진 잔디 바닥. 성벽 안쪽은 살짝 밟힌 색 */
-export function buildGrassGround(scene, map, wallsHalf) {
+/** tex = 잔디 텍스처(있으면 얼룩은 밝기 변화로만 곱해짐), tileMeters = 텍스처 한 장이 덮는 크기 */
+export function buildGrassGround(scene, map, wallsHalf, tex = null, tileMeters = 7) {
   const size = map.halfSize * 2;
   const seg = 72;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(-Math.PI / 2);
@@ -30,20 +31,40 @@ export function buildGrassGround(scene, map, wallsHalf) {
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
     const n = noise2(x * 0.12, z * 0.12) * 0.7 + noise2(x * 0.45, z * 0.45) * 0.3;
-    _c.copy(GRASS_B).lerp(GRASS_A, n);
-    if (noise2(x * 0.3 + 40, z * 0.3) > 0.72) _c.lerp(GRASS_C, 0.5); // 밝은 풀밭 얼룩
     const inside = Math.max(Math.abs(x), Math.abs(z));
-    if (inside < wallsHalf) _c.lerp(TRODDEN, 0.25 * (1 - inside / wallsHalf) + 0.1);
+    if (tex) {
+      // 텍스처 위에 곱해지는 밝기 얼룩 (흰색 근처) + 성벽 안쪽은 살짝 누렇게
+      const v = 0.84 + n * 0.2;
+      _c.setRGB(v, v, v * 0.96);
+      if (inside < wallsHalf) _c.lerp(_t.setRGB(1.0, 0.95, 0.78), 0.35 * (1 - inside / wallsHalf) + 0.1);
+    } else {
+      _c.copy(GRASS_B).lerp(GRASS_A, n);
+      if (noise2(x * 0.3 + 40, z * 0.3) > 0.72) _c.lerp(GRASS_C, 0.5); // 밝은 풀밭 얼룩
+      if (inside < wallsHalf) _c.lerp(TRODDEN, 0.25 * (1 - inside / wallsHalf) + 0.1);
+    }
     col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  let mat;
+  if (tex) {
+    const t = tex.clone();
+    t.repeat.set(size / tileMeters, size / tileMeters);
+    t.needsUpdate = true;
+    mat = new THREE.MeshLambertMaterial({ map: t, vertexColors: true });
+  } else mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const ground = new THREE.Mesh(geo, mat);
   ground.receiveShadow = true;
   scene.add(ground);
 
   // 맵 바깥: 어두운 숲 바닥 + 지평선 언덕
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 5, size * 5).rotateX(-Math.PI / 2),
-    new THREE.MeshLambertMaterial({ color: 0x3f6b30 }));
+  let outerMat = new THREE.MeshLambertMaterial({ color: 0x3f6b30 });
+  if (tex) {
+    const t = tex.clone();
+    t.repeat.set(size * 5 / tileMeters, size * 5 / tileMeters);
+    t.needsUpdate = true;
+    outerMat = new THREE.MeshLambertMaterial({ map: t, color: 0x9db58a }); // 바깥은 조금 어둡게
+  }
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 5, size * 5).rotateX(-Math.PI / 2), outerMat);
   outer.position.y = -0.03;
   scene.add(outer);
   const hills = [];

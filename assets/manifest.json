@@ -1,5 +1,15 @@
 {
   "_설명": "M6 아트 목록. 파일을 assets/models·assets/textures에 넣고 여기에 적으면 도형 대신 쓰인다. 비어 있거나 파일이 없으면 도형 그대로.",
   "models": {},
-  "textures": {}
+  "textures": {
+    "grass": {
+      "file": "textures/grass.jpg",
+      "repeat": 1
+    },
+    "path": {
+      "file": "textures/path.jpg",
+      "repeat": 1
+    }
+  },
+  "_출처": "design/art-ref/ 의 영주 생성 이미지(Higgsfield). 텍스처는 1024px로 줄이고 흙길 이음새를 코드로 보정"
 }

@@ -25,7 +25,8 @@ test('은화 더미로 걸어가면 등 뒤에 쌓이고 상단 숫자가 오른
   const st = await page.evaluate(() => __game.balance.coins.start);
   await teleport(st.x - 3, st.z);
   await page.keyboard.down('d'); await page.keyboard.down('s'); // 화면 오른쪽+아래 = 바닥 +x
-  await page.waitForTimeout(700);
+  // 더미 가운데를 지날 때까지 (느린 화면에서도 같은 결과가 나오도록 위치로 기다림)
+  await page.waitForFunction(x => __game.state.commander.x >= x, st.x + 0.5, { timeout: 10000 });
   await page.keyboard.up('d'); await page.keyboard.up('s');
   await page.waitForTimeout(400);
   const n = await page.evaluate(() => __game.state.commander.coins);

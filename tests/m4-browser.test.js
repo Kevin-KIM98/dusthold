@@ -70,7 +70,8 @@ test('거인이 성문 앞에 오면 성벽을 친다 (화면)', { skip }, async
     g.x = g.prevX = -0.7; g.z = g.prevZ = 14;
     g.wp = 3;
   });
-  await page.waitForFunction(() => __game.state.events.some(e => e.type === 'hit' && e.target === 'wall'), null, { timeout: 15000 });
+  // 거인이 성문까지 걸어와 칠 때까지 (게임 시간 기준이라 느린 화면에선 오래 걸림)
+  await page.waitForFunction(() => __game.state.walls.some(w => w.hp < w.maxHp), null, { timeout: 60000 });
   await teleport(-2, 8);
   await page.waitForTimeout(500);
   await page.screenshot({ path: join(ROOT, 'test-results/m4-giant.png') });

@@ -17,10 +17,10 @@ const meshInfo = page => page.evaluate(() => {
   return by;
 });
 
-test('아트 목록이 비어 있으면(기본) 전부 도형, 에러 0', { skip }, async () => {
+test('기본 아트 목록: 바닥 텍스처 2장만 쓰고 모델은 전부 도형, 에러 0', { skip }, async () => {
   const g = await openGame('?seed=1');
   try {
-    assert.deepEqual(await g.page.evaluate(() => __game.art), []);
+    assert.deepEqual((await g.page.evaluate(() => __game.art)).sort(), ['grass: 텍스처', 'path: 텍스처']);
     const by = await meshInfo(g.page);
     assert.deepEqual([by.archer, by.raider, by.giant], [['shape'], ['shape'], ['shape']], '모두 도형');
     assert.deepEqual(g.errors, []);
