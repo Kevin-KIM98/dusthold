@@ -13,7 +13,7 @@ const STILL = { x: 0, z: 0 };
 const run = (s, input, ticks) => { for (let i = 0; i < ticks; i++) step(s, input, B); };
 const place = (o, x, z) => { o.x = o.prevX = x; o.z = o.prevZ = z; };
 /** 웨이브가 오지 않는 조용한 상태 (개별 규칙 테스트용) */
-const quiet = () => { const s = createState(B, 1); s.coins = []; s.waves.current = B.waves.total; return s; };
+const quiet = () => { const s = createState(B, 1); s.coins = []; s.waves.paused = true; return s; };
 
 test('웨이브 1~10 크기·구성·시작 시각·길이 기획서 ③ 공식과 같다', () => {
   // 기획서 ③을 그대로 옮긴 기대값 (balance.json과 별개로 손으로 계산)

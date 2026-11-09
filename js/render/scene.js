@@ -7,6 +7,7 @@ import { createPadView } from './pads.js';
 import { createBuildingView } from './buildings.js';
 import { createFx } from './fx.js';
 import { createUnitView } from './units.js';
+import { createWallView } from './walls.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
@@ -55,6 +56,7 @@ export function createScene(state, balance, canvas) {
   const buildingView = createBuildingView(scene);
   const fx = createFx(scene, balance);
   const unitView = createUnitView(scene, balance);
+  const wallView = createWallView(scene, balance);
 
   // sim 이벤트 → 날아가는 은화 연출
   function playEvents(st, events) {
@@ -71,11 +73,13 @@ export function createScene(state, balance, canvas) {
           fx.fly(_a, _b, payN++ * 0.03);
         }
       } else if (e.type === 'shot') {
-        fx.shoot(e.x, e.z, e.tx, e.tz);
+        fx.shoot(e.x, e.z, e.tx, e.tz, e.from === 'tower' ? balance.towers.platformHeight + 1.0 : 1.0);
       } else if (e.type === 'enemyDown') {
         fx.puff(e.x, e.z, e.enemy === 'giant' ? 2.5 : 1);
       } else if (e.type === 'archerDown' || e.type === 'commanderDown') {
         fx.puff(e.x, e.z, 0.8);
+      } else if (e.type === 'wallDown') {
+        fx.puff(e.x, e.z, 2);
       } else if (e.type === 'smash') {
         fx.puff(e.x, e.z, 1.5);
       } else if (e.type === 'taxCollect') {
@@ -103,6 +107,7 @@ export function createScene(state, balance, canvas) {
       sun.position.set(focus.x, 0, focus.z).add(sunOffset);
       sun.target.position.set(focus.x, 0, focus.z);
       buildingView.sync(st, now);
+      wallView.sync(st);
       padView.sync(st, now);
       coinView.sync(st, commander, now);
       unitView.sync(st, alpha, now, camera, commander.position);

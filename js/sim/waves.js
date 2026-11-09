@@ -47,7 +47,8 @@ export function waveComposition(n, balance) {
 }
 
 export function createWaves() {
-  return { current: 0, queue: [] };
+  // paused: 테스트·디버그 장면용 (웨이브를 멈춤)
+  return { current: 0, queue: [], paused: false };
 }
 
 function secondsToTicks(s, balance) { return Math.round(s / balance.sim.tickSeconds); }
@@ -55,6 +56,7 @@ function secondsToTicks(s, balance) { return Math.round(s / balance.sim.tickSeco
 /** 웨이브 시작 시각이 되면 등장 대기열을 채우고, 대기열에서 시간 맞춰 적을 내보낸다 */
 export function updateWaves(state, balance, spawnEnemy) {
   const w = state.waves;
+  if (w.paused) return;
   const total = balance.waves.total;
   // 이번 틱이 끝나는 시각(tick+1)이 시작 시각에 닿으면 시작
   if (w.current < total && state.tick + 1 >= secondsToTicks(waveStartSeconds(w.current + 1, balance), balance)) {

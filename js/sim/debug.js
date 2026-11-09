@@ -6,7 +6,7 @@ import { spawnCoin } from './coins.js';
 export function makeWorstScene(state, balance) {
   const w = balance.debug.worst;
   const c = state.commander;
-  state.waves.current = balance.waves.total; // 일반 웨이브는 멈춤
+  state.waves.paused = true; // 일반 웨이브는 멈춤
   c.coins = w.carried;
   const saveMax = balance.archers.maxFollowers;
   balance.archers.maxFollowers = w.archers;

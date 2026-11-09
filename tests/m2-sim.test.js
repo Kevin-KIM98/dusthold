@@ -13,7 +13,7 @@ const STILL = { x: 0, z: 0 };
 const run = (s, input, ticks) => { for (let i = 0; i < ticks; i++) step(s, input, B); };
 const place = (s, x, z) => { const c = s.commander; c.x = c.prevX = x; c.z = c.prevZ = z; };
 const pad = (s, id) => s.pads.find(p => p.id === id);
-const fresh = () => { const s = createState(B, 1); s.coins = []; return s; };
+const fresh = () => { const s = createState(B, 1); s.coins = []; s.waves.paused = true; return s; };
 
 /** 간단한 자동 조종: 목표 지점까지 직선으로 걷기 */
 function goTo(s, x, z, maxTicks = 600) {
@@ -212,7 +212,8 @@ test('패드 자리는 길·성채·나무·바위·다른 패드와 겹치지 �
       const k = s.castle;
       assert.ok(Math.abs(p.x - k.x) > k.halfWidth + p.half || Math.abs(p.z - k.z) > k.halfDepth + p.half, `${p.id} 성채`);
       for (const o of s.obstacles) assert.ok(Math.hypot(p.x - o.x, p.z - o.z) > p.half * Math.SQRT2 + o.r, `${p.id} 장애물 seed ${seed}`);
-      for (const q of s.pads) if (q !== p) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > p.half * 2 + 1, `${p.id}-${q.id}`);
+      const shares = q => { const d = B.pads.list.find(x => x.id === p.id), e = B.pads.list.find(x => x.id === q.id); return d.sharesSpotWith === q.id || e.sharesSpotWith === p.id; };
+      for (const q of s.pads) if (q !== p && !shares(q)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > p.half * 2 + 1, `${p.id}-${q.id}`);
     }
   }
 });

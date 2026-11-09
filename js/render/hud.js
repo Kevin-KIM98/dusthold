@@ -5,7 +5,7 @@ import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
 
 const _v = new THREE.Vector3();
 
-export function createHud(root, balance, { showFps, onPause }) {
+export function createHud(root, balance, { showFps, onPause, onRestart }) {
   const pauseBtn = document.createElement('button');
   pauseBtn.className = 'ui btn pause';
   pauseBtn.setAttribute('aria-label', STR.pause);
@@ -81,6 +81,14 @@ export function createHud(root, balance, { showFps, onPause }) {
     dmgLive.push({ el, x: x + (Math.random() - 0.5) * 0.6, z, t: 0 });
   };
 
+  // 승리/패배 화면
+  const result = document.createElement('div');
+  result.className = 'ui overlay result hidden';
+  result.innerHTML = `<div class="panel"><h2 class="r-title"></h2><p class="r-wave"></p><p class="r-kills"></p><button class="btn wide r-again">${STR.restart}</button></div>`;
+  root.appendChild(result);
+  result.querySelector('.r-again').addEventListener('click', () => onRestart());
+  let shown = false;
+
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.textContent = STR.hintMove;
@@ -128,6 +136,18 @@ export function createHud(root, balance, { showFps, onPause }) {
       }
       if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.classList.add('hidden'); }
 
+      if (state.result && !shown) {
+        shown = true;
+        const win = state.result === 'win';
+        result.classList.toggle('win', win);
+        result.querySelector('.r-title').textContent = win ? STR.win : STR.lose;
+        // 버틴 웨이브: 이기면 전부, 지면 무너지기 전까지 끝까지 막아낸 웨이브(= 진행 중이던 웨이브 - 1)
+        const held = win ? balance.waves.total : Math.max(0, state.waves.current - 1);
+        result.querySelector('.r-wave').textContent = STR.survived(held, balance.waves.total);
+        result.querySelector('.r-kills').textContent = STR.kills(state.kills);
+        result.classList.remove('hidden');
+        pauseBtn.classList.add('hidden');
+      }
       const c = state.commander;
       downMsg.classList.toggle('hidden', c.alive);
       if (!c.alive) downMsg.textContent = STR.down(Math.ceil(c.respawn * balance.sim.tickSeconds));

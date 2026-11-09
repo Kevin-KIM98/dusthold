@@ -69,7 +69,7 @@
       "minScale": 0.8,
       "maxScale": 1.4,
       "keepOffPath": 2.5,
-      "keepOffCastle": 11,
+      "keepOffCastle": 14,
       "minGap": 1.4,
       "maxTries": 4000,
       "keepOffPad": 3
@@ -80,7 +80,7 @@
       "minScale": 0.7,
       "maxScale": 1.5,
       "keepOffPath": 2.5,
-      "keepOffCastle": 9,
+      "keepOffCastle": 14,
       "minGap": 1.6,
       "maxTries": 2000,
       "keepOffPad": 3
@@ -123,11 +123,12 @@
     "maxFlyingCoins": 60,
     "flySeconds": 0.35,
     "maxEnemies": 80,
-    "maxArchers": 24,
+    "maxArchers": 40,
     "maxDamageNumbers": 40,
     "maxArrows": 40,
     "arrowSeconds": 0.18,
-    "damageNumberSeconds": 0.8
+    "damageNumberSeconds": 0.8,
+    "maxWallPosts": 400
   },
   "coins": {
     "carryMax": 100,
@@ -135,8 +136,8 @@
     "lifetimeSeconds": 20,
     "start": {
       "count": 25,
-      "x": 3,
-      "z": 10,
+      "x": 2.5,
+      "z": 6.8,
       "spread": 1.2
     }
   },
@@ -173,6 +174,81 @@
           "barracks"
         ],
         "builds": "taxTable"
+      },
+      {
+        "id": "walls",
+        "x": -6.5,
+        "z": -3.5,
+        "cost": 30,
+        "requires": [
+          "taxTable"
+        ],
+        "builds": "walls"
+      },
+      {
+        "id": "tower1",
+        "x": -4.5,
+        "z": 9.3,
+        "cost": 30,
+        "requires": [
+          "walls"
+        ],
+        "builds": "tower"
+      },
+      {
+        "id": "tower2",
+        "x": 3.5,
+        "z": 9.3,
+        "cost": 30,
+        "requires": [
+          "walls"
+        ],
+        "builds": "tower"
+      },
+      {
+        "id": "tower3",
+        "x": 9.3,
+        "z": -3.5,
+        "cost": 30,
+        "requires": [
+          "walls"
+        ],
+        "builds": "tower"
+      },
+      {
+        "id": "tower4",
+        "x": 9.3,
+        "z": 4.5,
+        "cost": 30,
+        "requires": [
+          "walls"
+        ],
+        "builds": "tower"
+      },
+      {
+        "id": "towerUpgrade",
+        "x": -6.5,
+        "z": -7.5,
+        "cost": 100,
+        "costStep": 0,
+        "requires": [
+          "tower"
+        ],
+        "repeat": true,
+        "upgradeTowers": true,
+        "minTowers": 2
+      },
+      {
+        "id": "stoneWalls",
+        "x": -6.5,
+        "z": -3.5,
+        "cost": 100,
+        "requires": [
+          "walls"
+        ],
+        "minWave": 5,
+        "builds": "stoneWalls",
+        "sharesSpotWith": "walls"
       }
     ]
   },
@@ -188,6 +264,11 @@
       "intervalSeconds": 3,
       "max": 40,
       "collectRadius": 2.0
+    },
+    "tower": {
+      "hp": 500,
+      "halfWidth": 1.0,
+      "halfDepth": 1.0
     }
   },
   "archers": {
@@ -202,7 +283,8 @@
     "slotBack": 1.5,
     "slotRow": 1.1,
     "perRow": 3,
-    "spawnFront": 1.0
+    "spawnFront": 1.0,
+    "trailStep": 0.3
   },
   "castle": {
     "hp": 1500
@@ -284,5 +366,23 @@
       "damageNumbers": 40,
       "radius": 12
     }
+  },
+  "walls": {
+    "half": 11,
+    "thickness": 0.6,
+    "segmentLength": 5.5,
+    "gateLength": 3.6,
+    "woodHp": 600,
+    "stoneHp": 1500
+  },
+  "towers": {
+    "hp": 500,
+    "halfSize": 1.0,
+    "archers": 4,
+    "attack": 8,
+    "attackInterval": 1.0,
+    "range": 8,
+    "upgradeMultiplier": 1.5,
+    "platformHeight": 3.2
   }
 }

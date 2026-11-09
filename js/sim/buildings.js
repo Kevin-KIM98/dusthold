@@ -8,6 +8,10 @@ export function addBuilding(state, kind, x, z, balance) {
     hp: cfg.hp ?? 0, maxHp: cfg.hp ?? 0,
     stored: 0, timer: 0,
   };
+  if (kind === 'tower') {
+    b.upgraded = false;
+    b.towerArchers = Array.from({ length: balance.towers.archers }, () => ({ cooldown: 0, angle: 0 }));
+  }
   state.buildings.push(b);
   return b;
 }

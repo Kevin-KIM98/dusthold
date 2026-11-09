@@ -1,7 +1,7 @@
 // 전투: 자동 공격 · 피해 · 죽음(은화 떨어뜨림) · 성주 쓰러짐/부활
 import { range } from './rng.js';
 import { spawnCoin } from './coins.js';
-import { enemyAllyTarget, distToCastle } from './units.js';
+import { enemyTarget, inReach, distToCastle } from './units.js';
 
 const ticks = (s, balance) => Math.round(s / balance.sim.tickSeconds);
 
@@ -51,16 +51,34 @@ export function updateCombat(state, balance) {
     a.cooldown = ticks(acfg.attackInterval, balance);
   }
 
+  // 망루 궁수 (망루마다 4명, 고정 사격, 무적)
+  const tcfg = balance.towers;
+  for (const b of state.buildings) {
+    if (b.kind !== 'tower') continue;
+    const dmg = tcfg.attack * (b.upgraded ? tcfg.upgradeMultiplier : 1);
+    b.towerArchers.forEach((ta, i) => {
+      if (ta.cooldown > 0) ta.cooldown -= 1;
+      if (ta.cooldown > 0) return;
+      const e = nearestEnemy(state, b.x, b.z, tcfg.range, balance);
+      if (!e) return;
+      ta.angle = Math.atan2(e.x - b.x, e.z - b.z);
+      damageEnemy(state, e, dmg, balance);
+      const o = towerArcherOffset(i, b);
+      state.events.push({ type: 'shot', x: b.x + o.x, z: b.z + o.z, tx: e.x, tz: e.z, from: 'tower' });
+      ta.cooldown = ticks(tcfg.attackInterval, balance);
+    });
+  }
+
   // 적 공격
   for (const e of state.enemies) {
     if (e.hp <= 0) continue;
     const t = balance.enemies.types[e.type];
     if (e.cooldown > 0) e.cooldown -= 1;
     e.attacking = false;
-    const ally = enemyAllyTarget(state, e, balance);
+    const target = enemyTarget(state, e, balance);
     let hit = null;
-    if (ally && Math.hypot(ally.obj.x - e.x, ally.obj.z - e.z) <= t.radius + ally.r + t.reach + 1e-6) hit = ally;
-    else if (!ally && e.wp >= pathLen(state, e) && distToCastle(state, e) <= t.radius + t.reach + 1e-6) hit = { kind: 'castle', obj: state.castle };
+    if (target && inReach(e, target, balance)) hit = target;
+    else if (!target && e.wp >= pathLen(state, e) && distToCastle(state, e) <= t.radius + t.reach + 1e-6) hit = { kind: 'castle', obj: state.castle };
     if (!hit) continue;
     e.attacking = true;
     if (e.cooldown > 0) continue;
@@ -68,20 +86,32 @@ export function updateCombat(state, balance) {
     if (hit.kind === 'castle') {
       state.castle.hp = Math.max(0, state.castle.hp - t.attack);
       state.events.push({ type: 'hit', target: 'castle', x: e.x, z: e.z, dmg: t.attack });
-    } else if (t.splash) {
-      // 거인: 대상 주변 splash m 안 아군 모두
-      const px = hit.obj.x, pz = hit.obj.z;
+      continue;
+    }
+    if (hit.kind === 'wall') {
+      hit.obj.hp -= t.attack;
+      state.events.push({ type: 'hit', target: 'wall', id: hit.obj.id, x: hit.px, z: hit.pz, dmg: t.attack });
+    } else if (!t.splash) {
+      if (hit.kind === 'commander') hurtCommander(state, t.attack, balance);
+      else hurtArcher(state, hit.obj, t.attack);
+    }
+    if (t.splash) {
+      // 거인: 내려친 자리 주변 splash m 안 아군 모두
+      const px = hit.px, pz = hit.pz;
       if (c.alive && Math.hypot(c.x - px, c.z - pz) <= t.splash) hurtCommander(state, t.attack, balance);
       for (const a of state.archers) if (Math.hypot(a.x - px, a.z - pz) <= t.splash) hurtArcher(state, a, t.attack);
       state.events.push({ type: 'smash', x: px, z: pz });
-    } else if (hit.kind === 'commander') {
-      hurtCommander(state, t.attack, balance);
-    } else {
-      hurtArcher(state, hit.obj, t.attack);
     }
   }
 
   cleanupDead(state, balance);
+}
+
+/** 망루 위 궁수 i번 자리 (망루 중심 기준) */
+export function towerArcherOffset(i, b) {
+  const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+  const r = b.halfWidth * 0.55;
+  return { x: Math.cos(a) * r, z: Math.sin(a) * r };
 }
 
 function pathLen(state, e) { return state.paths.find(p => p.id === e.pathId).points.length; }
@@ -116,6 +146,7 @@ function updateRespawn(state, balance) {
   c.alive = true;
   c.hp = balance.commander.hp;
   c.x = c.prevX = s.x; c.z = c.prevZ = s.z; c.angle = c.prevAngle = s.angle;
+  c.trail = [[s.x, s.z]];
   state.events.push({ type: 'commanderRespawn', x: s.x, z: s.z });
 }
 
@@ -138,6 +169,10 @@ function cleanupDead(state, balance) {
       state.events.push({ type: 'enemyDown', id: e.id, enemy: e.type, x: e.x, z: e.z });
     }
     state.enemies = alive;
+  }
+  if (state.walls.some(w => w.hp <= 0)) {
+    for (const w of state.walls) if (w.hp <= 0) state.events.push({ type: 'wallDown', id: w.id, x: w.x, z: w.z, gate: w.gate });
+    state.walls = state.walls.filter(w => w.hp > 0);
   }
   if (state.archers.some(a => a.hp <= 0)) {
     for (const a of state.archers) if (a.hp <= 0) state.events.push({ type: 'archerDown', id: a.id, x: a.x, z: a.z });

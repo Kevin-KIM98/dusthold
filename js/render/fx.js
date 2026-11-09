@@ -27,9 +27,9 @@ export function createFx(scene, balance) {
   const _d = new THREE.Vector3(), _fwd = new THREE.Vector3(0, 0, 1);
 
   return {
-    shoot(x, z, tx, tz) {
+    shoot(x, z, tx, tz, y = 1.0) {
       if (shots.length >= arrowMax) shots.shift();
-      shots.push({ a: new THREE.Vector3(x, 1.0, z), b: new THREE.Vector3(tx, 0.8, tz), t: 0 });
+      shots.push({ a: new THREE.Vector3(x, y, z), b: new THREE.Vector3(tx, 0.8, tz), t: 0 });
     },
     puff(x, z, size = 1) {
       const n = Math.round(8 * size);

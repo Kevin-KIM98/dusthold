@@ -2,6 +2,7 @@
 import { addBuilding } from './buildings.js';
 import { resolveCollisions } from './commander.js';
 import { spawnArchers } from './units.js';
+import { buildWalls } from './walls.js';
 
 export function createPads(balance) {
   return balance.pads.list.map(def => ({
@@ -19,6 +20,13 @@ export function refreshPads(state, balance) {
     const reqOk = def.requires.every(r => state.unlocked[r]);
     let open = reqOk && !pad.done;
     if (def.archersPerUse && state.archers.length >= balance.archers.maxFollowers) open = false;
+    if (def.minWave && state.waves.current < def.minWave) open = false;
+    if (def.upgradeTowers) {
+      const towers = state.buildings.filter(b => b.kind === 'tower');
+      if (towers.length < (def.minTowers || 1) || !towers.some(b => !b.upgraded)) open = false;
+    }
+    // 같은 자리를 쓰는 다른 패드가 아직 열려 있으면 숨김 (성벽 → 돌벽)
+    if (def.sharesSpotWith && !state.pads.find(p => p.id === def.sharesSpotWith).done) open = false;
     pad.open = open;
   }
 }
@@ -44,14 +52,28 @@ export function updatePads(state, balance) {
   }
 }
 
+/** 새로 생긴 벽·건물 안에 갇힌 아군을 밀어낸다 */
+function resolveAllies(state, balance) {
+  resolveCollisions(state, state.commander, balance.commander.radius, balance.map.halfSize);
+  for (const a of state.archers) resolveCollisions(state, a, balance.archers.radius, balance.map.halfSize);
+}
+
 function unlockPad(state, pad, balance) {
   const def = defOf(balance, pad.id);
   state.events.push({ type: 'unlock', padId: pad.id });
-  if (def.builds) {
+  if (def.builds === 'walls' || def.builds === 'stoneWalls') {
+    buildWalls(state, balance, def.builds === 'walls' ? 1 : 2);
+    state.unlocked[def.builds] = true;
+    resolveAllies(state, balance);
+  } else if (def.builds) {
     addBuilding(state, def.builds, pad.x, pad.z, balance);
     state.unlocked[def.builds] = true;
     // 성주가 패드 위(=건물 자리)에 서 있었으면 바로 밀어낸다
     resolveCollisions(state, state.commander, balance.commander.radius, balance.map.halfSize);
+  }
+  if (def.upgradeTowers) {
+    const t = state.buildings.find(b => b.kind === 'tower' && !b.upgraded);
+    if (t) { t.upgraded = true; state.events.push({ type: 'towerUpgrade', id: t.id, x: t.x, z: t.z }); }
   }
   if (def.repeat) {
     pad.uses += 1;

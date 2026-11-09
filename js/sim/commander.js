@@ -20,6 +20,19 @@ export function moveCommander(state, input, balance) {
   c.angle = turnToward(c.angle, Math.atan2(ix, iz), cfg.turnRate * dt);
 
   resolveCollisions(state, c, cfg.radius, balance.map.halfSize);
+  recordTrail(c, balance);
+}
+
+/** 성주가 지나간 길 (궁수가 이 길을 따라 걷는다). 최신이 앞 */
+export function recordTrail(c, balance) {
+  const a = balance.archers;
+  const step = a.trailStep;
+  const maxLen = Math.ceil((a.slotBack + a.slotRow * Math.ceil(a.maxFollowers / a.perRow) + 2) / step) + 2;
+  const last = c.trail[0];
+  if (!last || Math.hypot(c.x - last[0], c.z - last[1]) >= step) {
+    c.trail.unshift([c.x, c.z]);
+    if (c.trail.length > maxLen) c.trail.length = maxLen;
+  }
 }
 
 /** 나무·바위·성채·건물·맵 경계와 겹치지 않게 밀어낸다 */
@@ -27,6 +40,7 @@ export function resolveCollisions(state, body, r, halfSize) {
   for (let pass = 0; pass < 3; pass++) {
     let hit = pushOutOfBox(body, r, state.castle);
     for (const b of state.buildings) hit = pushOutOfBox(body, r, b) || hit;
+    for (const w of state.walls) if (!w.gate) hit = pushOutOfBox(body, r, w) || hit; // 아군은 성문 통과
     for (const o of state.obstacles) hit = pushOutOfCircle(body, r, o) || hit;
     clampToBounds(body, r, halfSize);
     if (!hit) break;

@@ -23,6 +23,7 @@ export function createState(balance, seed) {
       alive: true,
       respawn: 0,
       cooldown: 0,
+      trail: [[start.x, start.z]],
     },
     castle: { ...map.castle, hp: balance.castle.hp, maxHp: balance.castle.hp },
     paths: map.paths.map(p => ({ id: p.id, width: p.width, points: p.points.map(pt => [pt[0], pt[1]]) })),
@@ -37,6 +38,9 @@ export function createState(balance, seed) {
     enemies: [],
     waves: createWaves(),
     kills: 0,
+    walls: [],
+    wallLevel: 0,
+    result: null,
   };
   scatter(state, map, 'tree', map.trees);
   scatter(state, map, 'rock', map.rocks);
@@ -55,7 +59,8 @@ function scatter(state, map, kind, cfg) {
     const z = range(state.rng, -lim, lim);
     const scale = range(state.rng, cfg.minScale, cfg.maxScale);
     const r = cfg.radius * scale;
-    if (Math.hypot(x - state.castle.x, z - state.castle.z) < cfg.keepOffCastle) continue;
+    // 성채 주변 네모 구역(성벽 안쪽 + 여유)은 비워 둔다
+    if (Math.max(Math.abs(x - state.castle.x), Math.abs(z - state.castle.z)) < cfg.keepOffCastle) continue;
     if (Math.hypot(x - start.x, z - start.z) < cfg.keepOffCastle) continue;
     let ok = true;
     for (const p of state.paths) {

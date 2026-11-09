@@ -25,7 +25,7 @@ async function boot() {
   const controls = createControls(canvas, document.getElementById('joy'), balance);
 
   let paused = false;
-  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; } });
+  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: () => location.reload() });
 
   function resize() {
     view.renderer.setSize(innerWidth, innerHeight, false);

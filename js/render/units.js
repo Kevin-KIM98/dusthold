@@ -1,14 +1,15 @@
 // 유닛 그리기: 궁수 · 약탈자 · 방패 약탈자 · 바위 거인 (부위별 InstancedMesh) + 머리 위 체력 바
 import * as THREE from 'three';
+import { towerArcherOffset } from '../sim/combat.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
 /** 부위 목록 [{ geo, color, flat }] 으로 같은 모양 여러 개를 그리는 묶음. 부위 위치는 지오메트리에 미리 구워 둔다 */
-function makeRig(scene, parts, max) {
+function makeRig(scene, parts, max, name) {
   const meshes = parts.map(pt => {
     const m = new THREE.InstancedMesh(pt.geo, new THREE.MeshLambertMaterial({ color: pt.color, flatShading: !!pt.flat }), max);
-    m.count = 0; m.castShadow = true; m.frustumCulled = false;
+    m.count = 0; m.castShadow = true; m.frustumCulled = false; m.name = name;
     scene.add(m);
     return m;
   });
@@ -86,16 +87,16 @@ function giantParts() {
 const UNIT_SCALE = 1.25;
 
 // 머리 위 체력 바 높이(m, 키운 뒤 기준)
-const BAR_Y = { archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
-const BAR_W = { archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
+const BAR_Y = { wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
+const BAR_W = { wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
 
 export function createUnitView(scene, balance) {
   const r = balance.render;
-  const archers = makeRig(scene, archerParts(), r.maxArchers);
+  const archers = makeRig(scene, archerParts(), r.maxArchers, 'archer');
   const enemies = {
-    raider: makeRig(scene, raiderParts(), r.maxEnemies),
-    shield: makeRig(scene, shieldParts(), r.maxEnemies),
-    giant: makeRig(scene, giantParts(), 8),
+    raider: makeRig(scene, raiderParts(), r.maxEnemies, 'raider'),
+    shield: makeRig(scene, shieldParts(), r.maxEnemies, 'shield'),
+    giant: makeRig(scene, giantParts(), 8, 'giant'),
   };
 
   // 체력 바: 배경 + 채움 (화면을 향하는 평면)
@@ -123,7 +124,16 @@ export function createUnitView(scene, balance) {
 
   return {
     sync(state, alpha, now, camera, commanderPos) {
-      archers.sync(state.archers.map(a => pose(a, alpha, now, 0.08)));
+      const archerItems = state.archers.map(a => pose(a, alpha, now, 0.08));
+      const platform = balance.towers.platformHeight;
+      for (const b of state.buildings) {
+        if (b.kind !== 'tower') continue;
+        b.towerArchers.forEach((ta, i) => {
+          const o = towerArcherOffset(i, b);
+          archerItems.push({ x: b.x + o.x, z: b.z + o.z, y: platform, angle: ta.angle, scale: UNIT_SCALE });
+        });
+      }
+      archers.sync(archerItems);
       const byType = { raider: [], shield: [], giant: [] };
       for (const e of state.enemies) {
         const p = pose(e, alpha, now, e.type === 'giant' ? 0.12 : 0.07);
@@ -157,6 +167,7 @@ export function createUnitView(scene, balance) {
       }
       const c = state.commander;
       if (c.alive && c.hp < balance.commander.hp) bar(commanderPos.x, BAR_Y.commander, commanderPos.z, BAR_W.commander, c.hp / balance.commander.hp, GREEN);
+      for (const w of state.walls) if (w.hp < w.maxHp) bar(w.x, BAR_Y.wall, w.z, Math.min(BAR_W.wall, 2 * Math.max(w.halfWidth, w.halfDepth)), w.hp / w.maxHp, GOLD);
       const k = state.castle;
       if (k.hp < k.maxHp) bar(k.x, BAR_Y.castle, k.z, BAR_W.castle, k.hp / k.maxHp, GOLD);
       barBg.count = barFill.count = n;
