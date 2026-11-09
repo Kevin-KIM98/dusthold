@@ -16,9 +16,9 @@ function nearestEnemy(state, x, z, rangeM, balance) {
   return best;
 }
 
-function damageEnemy(state, e, dmg, balance) {
+function damageEnemy(state, e, dmg, balance, by = '') {
   e.hp -= dmg;
-  state.events.push({ type: 'hit', target: 'enemy', id: e.id, x: e.x, z: e.z, dmg });
+  state.events.push({ type: 'hit', target: 'enemy', id: e.id, x: e.x, z: e.z, dmg, by });
 }
 
 export function updateCombat(state, balance) {
@@ -32,7 +32,7 @@ export function updateCombat(state, balance) {
     if (c.cooldown <= 0) {
       const e = nearestEnemy(state, c.x, c.z, ccfg.range, balance);
       if (e) {
-        damageEnemy(state, e, ccfg.attack, balance);
+        damageEnemy(state, e, ccfg.attack, balance, 'commander');
         state.events.push({ type: 'slash', x: c.x, z: c.z, tx: e.x, tz: e.z });
         c.cooldown = ticks(ccfg.attackInterval, balance);
       }

@@ -54,8 +54,10 @@ test('망루를 해금하면 궁수 4명이 올라가 적을 쏜다', { skip }, 
     const t = s.buildings.find(b => b.kind === 'tower');
     const e = spawnEnemy(s, 'shield', 'south', __game.balance);
     e.x = e.prevX = t.x + 1; e.z = e.prevZ = t.z + 5;
+    window.__towerTarget = e;
   });
-  await page.waitForFunction(() => __game.state.events.some(e => e.type === 'shot' && e.from === 'tower') || __game.state.kills > 0, null, { timeout: 5000 });
+  // 망루 화살에 맞아 체력이 줄거나 쓰러질 때까지 (한 틱짜리 이벤트를 놓치지 않도록 상태로 확인)
+  await page.waitForFunction(() => __towerTarget.hp < __towerTarget.maxHp, null, { timeout: 15000 });
   await teleport(-1, 6);
   await page.waitForTimeout(250);
   await page.screenshot({ path: join(ROOT, 'test-results/m4-tower.png') });

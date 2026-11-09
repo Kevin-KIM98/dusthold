@@ -81,6 +81,53 @@ test('궁수·성주가 적을 자동 공격 → 화살·데미지 숫자, 처�
   assert.ok(await page.evaluate(() => __game.state.coins.length) > 0, '은화가 떨어짐');
 });
 
+test('성주가 칼을 휘두르며 공격한다 (칼 움직임·칼바람·큰 노란 숫자·소리)', { skip }, async () => {
+  // 일반 속도 페이지 따로 (4배속+느린 화면에선 매 프레임이 휘두르기의 같은 순간만 찍혀서 확인이 안 됨)
+  const g2 = await openGame('?seed=1');
+  const page = g2.page;
+  try {
+  await page.mouse.click(60, 700); // 소리 켜기용 첫 터치
+  await page.evaluate(async () => {
+    const s = __game.state, c = s.commander;
+    const { spawnEnemy } = await import('./js/sim/units.js');
+    s.waves.paused = true;
+    // 큰 노란 숫자가 만들어지는 순간을 기록 (느린 화면에서 0.8초짜리 숫자를 놓치지 않게)
+    window.__bigNums = [];
+    new MutationObserver(list => {
+      for (const m of list) {
+        const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+        if (el && el.classList && el.classList.contains('big')) window.__bigNums.push(el.textContent);
+      }
+    }).observe(document.getElementById('ui'), { subtree: true, attributes: true, attributeFilter: ['class'], childList: true, characterData: true });
+    c.x = c.prevX = 0; c.z = c.prevZ = 18; c.cooldown = 0;
+    const e = spawnEnemy(s, 'shield', 'south', __game.balance);
+    e.x = e.prevX = 1.6; e.z = e.prevZ = 18.6; e.wp = 99;
+    e.hp = e.maxHp = 1e6; // 오래 버티게 → 느린 화면에서도 휘두르는 순간이 잡히도록
+    window.__swing = { min: 9, max: -9, fx: false };
+    const sword = __game.view.commanderObject.getObjectByName('sword');
+    const watch = () => {
+      const r = sword.rotation.x; __swing.min = Math.min(__swing.min, r); __swing.max = Math.max(__swing.max, r);
+      __game.view.scene.traverse(o => { if (o.name === 'slashFx' && o.visible) __swing.fx = true; });
+      if (!__swing.done) requestAnimationFrame(watch);
+    };
+    watch();
+  });
+  try {
+    // 칼이 평소 자세에서 움직였는지 + 칼바람 (휘두르기 곡선 자체는 m3-sim 테스트에서 정확히 확인)
+    await page.waitForFunction(() => __swing.fx && __swing.max - __swing.min > 0.3, null, { timeout: 20000 });
+  } catch (err) {
+    const dbg = await page.evaluate(() => ({ sw: __swing, alive: __game.state.commander.alive, cd: __game.state.commander.cooldown, en: __game.state.enemies.map(e => [e.type, +e.x.toFixed(1), +e.z.toFixed(1), e.hp]), c: [__game.state.commander.x, __game.state.commander.z], paused: __game.isPaused(), result: __game.state.result }));
+    throw new Error('휘두르기 안 보임 ' + JSON.stringify(dbg));
+  }
+  const big = await page.evaluate(() => __bigNums);
+  await page.screenshot({ path: join(ROOT, 'test-results/m3-commander-attack.png') });
+  await page.evaluate(() => { __swing.done = true; __game.state.enemies.forEach(e => { if (e.maxHp === 1e6) e.hp = 0; }); });
+  const bal = await page.evaluate(() => __game.balance.commander.attack);
+  assert.ok(big.includes(String(bal)), `큰 노란 숫자 ${bal} — ${JSON.stringify(big)}`);
+  assert.ok((await page.evaluate(() => __game.sound.stats().slash)) > 0, '휘두르는 소리');
+  } finally { await g2.close(); }
+});
+
 test('성주가 쓰러지면 안내가 뜨고 모습이 사라졌다가 5초 뒤 부활한다', { skip }, async () => {
   await page.evaluate(async () => {
     const s = __game.state, c = s.commander;

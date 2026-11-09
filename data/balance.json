@@ -92,9 +92,9 @@
     "speed": 5.5,
     "turnRate": 14,
     "inputDeadzone": 0.12,
-    "attack": 12,
+    "attack": 30,
     "attackInterval": 0.8,
-    "range": 1.5,
+    "range": 2.0,
     "respawnSeconds": 5,
     "dropFraction": 0.5,
     "dropSpread": 1.2
@@ -190,7 +190,8 @@
       },
       "grassTileMeters": 7,
       "pathTileMeters": 3
-    }
+    },
+    "slashSeconds": 0.28
   },
   "coins": {
     "carryMax": 100,

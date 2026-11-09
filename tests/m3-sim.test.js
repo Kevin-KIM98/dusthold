@@ -6,6 +6,7 @@ import { createState } from '../js/sim/state.js';
 import { step } from '../js/sim/rules.js';
 import { waveSize, waveComposition, waveStartSeconds, wavePathIds, bossCount } from '../js/sim/waves.js';
 import { spawnEnemy, spawnArchers } from '../js/sim/units.js';
+import { swordAngle, SWORD_IDLE, SWORD_RAISE, SWORD_STRIKE } from '../js/render/anim.js';
 
 const B = loadBalance();
 const TPS = Math.round(1 / B.sim.tickSeconds);
@@ -116,17 +117,19 @@ test('궁수는 사거리(6m) 안 적을 쏘고, 적 체력이 0이면 사라지
   assert.equal(s.coins.length - coinsBefore, B.enemies.types.raider.coins, '은화 떨어뜨림');
 });
 
-test('성주는 1.5m 안 적을 0.8초마다 12씩 때린다', () => {
+test('성주는 사거리 안 적을 공격 간격마다 공격력만큼 때린다 (궁수보다 훨씬 셈)', () => {
+  assert.ok(B.commander.attack / B.commander.attackInterval >= 2.5 * B.archers.attack / B.archers.attackInterval, '성주 초당 피해가 궁수의 2.5배 이상');
   const s = quiet();
   place(s.commander, 0, 20);
   const e = spawnEnemy(s, 'shield', 'south', B);
-  place(e, 1.2, 20);
+  place(e, B.commander.range, 20); // 가장자리까지 거리 = 사거리 − 반지름 → 닿음
   e.wp = 99;
   const hp0 = e.hp;
   run(s, STILL, 1);
-  assert.equal(e.hp, hp0 - 12);
-  run(s, STILL, Math.round(0.8 * TPS));
-  assert.equal(e.hp, hp0 - 24);
+  assert.equal(e.hp, hp0 - B.commander.attack);
+  assert.ok(s.events.some(ev => ev.type === 'slash'), '휘두르기 이벤트');
+  run(s, STILL, Math.round(B.commander.attackInterval * TPS));
+  assert.equal(e.hp, hp0 - 2 * B.commander.attack); // 방패 약탈자(140)는 두 대로는 안 죽음
 });
 
 test('적은 2m 안 아군에게 다가가 공격한다 → 궁수는 죽으면 사라지고 모집 패드가 다시 열린다', () => {
@@ -205,4 +208,14 @@ test('같은 시드면 웨이브 3개를 싸운 결과가 같다 (결정론)', (
   const a = play();
   assert.deepEqual(a, play());
   assert.ok(a.kills > 0, '적을 처치함');
+});
+
+test('성주 칼 휘두르기 연출: 치켜들었다가 → 앞으로 내려치고 → 제자리', () => {
+  assert.equal(swordAngle(-0.1), SWORD_IDLE);
+  assert.equal(swordAngle(0), SWORD_IDLE);
+  assert.ok(Math.abs(swordAngle(0.3) - SWORD_RAISE) < 1e-9, '뒤로 치켜듦');
+  assert.ok(Math.abs(swordAngle(0.7) - SWORD_STRIKE) < 1e-9, '앞으로 내려침');
+  assert.ok(Math.abs(swordAngle(1.6) - SWORD_IDLE) < 1e-9, '제자리');
+  // 0.3→0.7 구간에서 계속 앞으로만 움직임
+  for (let u = 0.3; u < 0.7; u += 0.05) assert.ok(swordAngle(u + 0.05) > swordAngle(u));
 });

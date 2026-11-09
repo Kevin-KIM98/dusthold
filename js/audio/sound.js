@@ -58,6 +58,7 @@ export function createSound(cfg) {
     pay() { tone(620, 0.04, { type: 'square', vol: 0.06, slide: 0.8 }); },
     unlock() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.22, delay: i * 0.07 })); },
     hit() { noise(0.07, { freq: 1800, vol: 0.18 }); },
+    slash() { noise(0.12, { freq: 3200, vol: 0.22 }); tone(240, 0.1, { type: 'triangle', vol: 0.15, slide: 0.5, delay: 0.05 }); },
     hurt() { noise(0.12, { freq: 500, vol: 0.3 }); tone(160, 0.12, { type: 'sine', vol: 0.2, slide: 0.6 }); },
     wave() { tone(196, 0.35, { type: 'sawtooth', vol: 0.12 }); tone(262, 0.55, { type: 'sawtooth', vol: 0.12, delay: 0.3 }); },
     down() { tone(330, 0.09, { type: 'square', vol: 0.06, slide: 0.5 }); },
@@ -65,7 +66,7 @@ export function createSound(cfg) {
     win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.3, { type: 'triangle', vol: 0.22, delay: i * 0.12 })); },
     lose() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.4, { type: 'sawtooth', vol: 0.1, delay: i * 0.18 })); },
   };
-  const GAP = { pickup: 0.035, pay: 0.06, hit: 0.05, hurt: 0.12, down: 0.06 };
+  const GAP = { pickup: 0.035, pay: 0.06, hit: 0.05, hurt: 0.12, down: 0.06, slash: 0.1 };
 
   function play(name) {
     played[name] = (played[name] || 0) + 1;
@@ -86,6 +87,7 @@ export function createSound(cfg) {
           case 'unlock': case 'towerUpgrade': play('unlock'); break;
           case 'hit': play(e.target === 'enemy' || e.target === 'wall' ? 'hit' : 'hurt'); break;
           case 'waveStart': play('wave'); break;
+          case 'slash': play('slash'); break;
           case 'enemyDown': play('down'); break;
           case 'wallDown': play('wall'); break;
           case 'gameOver': play(e.result === 'win' ? 'win' : 'lose'); break;

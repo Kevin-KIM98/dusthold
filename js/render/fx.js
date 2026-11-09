@@ -26,7 +26,26 @@ export function createFx(scene, balance) {
   const bits = [];
   const _d = new THREE.Vector3(), _fwd = new THREE.Vector3(0, 0, 1);
 
+  // 칼바람: 성주 앞에 반달 모양이 휙 퍼지며 사라짐 (투명도 때문에 몇 개만 돌려 씀)
+  const slashes = [];
+  const slashGeo = new THREE.RingGeometry(0.7, 1.6, 18, 1, Math.PI / 2 - 1.1, 2.2).rotateX(-Math.PI / 2);
+  for (let i = 0; i < 4; i++) {
+    const m = new THREE.Mesh(slashGeo, new THREE.MeshBasicMaterial({ color: 0xe6fbff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    m.visible = false; m.renderOrder = 6; m.name = 'slashFx';
+    scene.add(m);
+    slashes.push({ m, t: 1 });
+  }
+  const slashDur = balance.render.slashSeconds * 1.3;
+  let slashNext = 0;
+
   return {
+    slash(x, z, yaw) {
+      const s = slashes[slashNext++ % slashes.length];
+      s.t = 0;
+      s.m.position.set(x, 1.15, z);
+      s.m.rotation.y = yaw + Math.PI; // 링의 +z 쪽이 앞
+      s.m.visible = true;
+    },
     shoot(x, z, tx, tz, y = 1.0) {
       if (shots.length >= arrowMax) shots.shift();
       shots.push({ a: new THREE.Vector3(x, y, z), b: new THREE.Vector3(tx, 0.8, tz), t: 0 });
@@ -86,6 +105,15 @@ export function createFx(scene, balance) {
         puffs.setMatrixAt(n++, _m.compose(b.p, _q.identity(), _s.set(k, k, k)));
       }
       puffs.count = n; puffs.instanceMatrix.needsUpdate = true;
+
+      for (const s of slashes) {
+        if (!s.m.visible) continue;
+        s.t += dt;
+        const u = s.t / slashDur;
+        if (u >= 1) { s.m.visible = false; continue; }
+        s.m.material.opacity = 0.9 * (1 - u);
+        s.m.scale.setScalar(0.8 + u * 0.6);
+      }
     },
   };
 }

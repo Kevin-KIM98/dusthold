@@ -11,6 +11,7 @@ import { createWallView } from './walls.js';
 import { createGuideView } from './guide.js';
 import { bakeParts, bakeGroup, vcMaterial } from './merge.js';
 import { buildGrassGround, buildScatter, hash2 } from './decor.js';
+import { swordAngle, SWORD_IDLE } from './anim.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
@@ -68,6 +69,10 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   const wallView = createWallView(scene, balance);
   const guideView = createGuideView(scene, balance);
 
+  const attack = { yaw: 0, start: -1e9 };
+  let lastNow = 0;
+  let faceYaw = state.commander.angle;
+  const sword = commander.getObjectByName('sword');
   // sim 이벤트 → 날아가는 은화 연출
   function playEvents(st, events) {
     let payN = 0, pickN = 0;
@@ -92,6 +97,11 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
         fx.puff(e.x, e.z, 2);
       } else if (e.type === 'smash') {
         fx.puff(e.x, e.z, 1.5);
+      } else if (e.type === 'slash') {
+        // 성주가 적 쪽으로 몸을 돌리고 칼을 휘두름 + 칼바람
+        attack.yaw = Math.atan2(e.tx - e.x, e.tz - e.z);
+        attack.start = lastNow;
+        fx.slash(commander.position.x, commander.position.z, attack.yaw);
       } else if (e.type === 'taxCollect') {
         const n = Math.min(e.n, 15);
         for (let i = 0; i < n; i++) {
@@ -109,7 +119,16 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
     sync(st, alpha, focus, events, now, dt, camera) {
       const c = st.commander;
       commander.position.set(lerp(c.prevX, c.x, alpha), 0, lerp(c.prevZ, c.z, alpha));
-      commander.rotation.y = lerpAngle(c.prevAngle, c.angle, alpha);
+      // 공격 연출은 게임 시간 기준 (?fast 배속에서도 휘두르기가 끝까지 보이도록)
+      const gameNow = st.time + alpha * balance.sim.tickSeconds;
+      lastNow = gameNow;
+      // 싸우는 동안(마지막 공격 후 공격 간격 + 조금)은 적 쪽을, 아니면 걷는 방향을 본다. 부드럽게 돈다 (연출만)
+      const fighting = gameNow - attack.start < balance.commander.attackInterval + 0.25;
+      const want = fighting ? attack.yaw : lerpAngle(c.prevAngle, c.angle, alpha);
+      faceYaw = lerpAngle(faceYaw, want, Math.min(1, dt * 14));
+      commander.rotation.y = faceYaw;
+      const su = (gameNow - attack.start) / balance.render.slashSeconds;
+      if (sword) sword.rotation.x = swordAngle(su);
       // 걷는 동안 살짝 통통 튀기
       const bob = c.moving ? Math.abs(Math.sin(st.time * 12)) * 0.08 : 0;
       commander.children[0].position.y = bob;
@@ -360,6 +379,18 @@ function buildCommander(art) {
   const baked = bakeGroup(body, { receiveShadow: false });
   root.remove(body);
   root.add(baked.group);
+  // 칼: 오른손(바라보는 방향 기준 오른쪽 = -x), 어깨를 축으로 휘두른다
+  const sword = new THREE.Group();
+  sword.name = 'sword';
+  sword.position.set(-0.27, 1.5, 0.02);
+  const sm = c => new THREE.MeshLambertMaterial({ color: c });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.95, 0.03).translate(0, 0.72, 0), sm(0xf2f6fa));
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 4).translate(0, 1.28, 0), sm(0xf2f6fa));
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.07).translate(0, 0.24, 0), sm(COLORS.gold));
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).translate(0, 0.12, 0), sm(COLORS.belt));
+  for (const m of [blade, tip, guard, grip]) { m.castShadow = true; sword.add(m); }
+  sword.rotation.x = SWORD_IDLE;
+  baked.group.add(sword);
   root.scale.setScalar(COMMANDER_SCALE);
   return root;
 }

@@ -24,10 +24,10 @@ test('은화 더미로 걸어가면 등 뒤에 쌓이고 상단 숫자가 오른
   assert.equal(await hudCoins(), 0);
   const st = await page.evaluate(() => __game.balance.coins.start);
   await teleport(st.x - 3, st.z);
-  await page.keyboard.down('d'); await page.keyboard.down('s'); // 화면 오른쪽+아래 = 바닥 +x
-  // 더미 가운데를 지날 때까지 (느린 화면에서도 같은 결과가 나오도록 위치로 기다림)
-  await page.waitForFunction(x => __game.state.commander.x >= x, st.x + 0.5, { timeout: 10000 });
-  await page.keyboard.up('d'); await page.keyboard.up('s');
+  // 정확히 동쪽(+x)으로 더미 한가운데를 지나가게 (키 두 개를 누르는 시간차에 따라 결과가 달라지지 않도록 테스트용 입력 사용)
+  await page.evaluate(() => { __game.inputOverride = () => ({ x: 1, z: 0 }); });
+  await page.waitForFunction(x => __game.state.commander.x >= x, st.x + 1.6, { timeout: 10000 });
+  await page.evaluate(() => { __game.inputOverride = null; });
   await page.waitForTimeout(400);
   const n = await page.evaluate(() => __game.state.commander.coins);
   assert.ok(n >= 20, `주운 은화 ${n}`);

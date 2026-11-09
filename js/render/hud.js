@@ -144,7 +144,7 @@ export function createHud(root, balance, { showFps, onPause, onRestart, sound })
       castleFill.style.width = `${state.castle.hp / state.castle.maxHp * 100}%`;
 
       for (const e of events) {
-        if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target === 'enemy' ? 'to-enemy' : 'to-ally');
+        if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target !== 'enemy' ? 'to-ally' : e.by === 'commander' ? 'to-enemy big' : 'to-enemy');
         else if (e.type === 'waveStart') { banner.textContent = STR.waveStart(e.wave); banner.classList.remove('hidden'); bannerT = 2; }
       }
       if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.classList.add('hidden'); }
