@@ -1,5 +1,6 @@
 // 바닥 패드: 어두운 바닥 + 흰 테두리 + 납부한 만큼 아래에서부터 차오르는 초록 칸
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export function createPadView(scene, state) {
   const baseMat = new THREE.MeshBasicMaterial({ color: 0x1f2a1c, transparent: true, opacity: 0.45 });
@@ -18,11 +19,10 @@ export function createPadView(scene, state) {
     fill.rotation.x = -Math.PI / 2;
     fill.position.set(0, 0.005, s / 2); // 화면 쪽(+z) 변에서 시작
     const w = 0.12;
-    for (const [x, z, sx, sz] of [[0, -pad.half, s + w, w], [0, pad.half, s + w, w], [-pad.half, 0, w, s], [pad.half, 0, w, s]]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.04, sz), frameMat);
-      bar.position.set(x, 0.01, z);
-      g.add(bar);
-    }
+    // 테두리 네 변을 한 덩어리로
+    const bars = [[0, -pad.half, s + w, w], [0, pad.half, s + w, w], [-pad.half, 0, w, s], [pad.half, 0, w, s]]
+      .map(([x, z, sx, sz]) => new THREE.BoxGeometry(sx, 0.04, sz).translate(x, 0.01, z));
+    g.add(new THREE.Mesh(mergeGeometries(bars), frameMat));
     g.add(base, fill);
     scene.add(g);
     views.set(pad.id, { g, fill });

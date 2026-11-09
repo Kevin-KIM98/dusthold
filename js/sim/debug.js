@@ -2,11 +2,22 @@
 import { range } from './rng.js';
 import { spawnEnemy, spawnArchers } from './units.js';
 import { spawnCoin } from './coins.js';
+import { addBuilding } from './buildings.js';
+import { buildWalls } from './walls.js';
 
 export function makeWorstScene(state, balance) {
   const w = balance.debug.worst;
   const c = state.commander;
   state.waves.paused = true; // 일반 웨이브는 멈춤
+  // 기지 전체 (건물·망루 4·성벽) — 그리기 부담이 가장 큰 상태
+  for (const def of balance.pads.list) {
+    if (def.builds && balance.buildings[def.builds]) addBuilding(state, def.builds, def.x, def.z, balance);
+    const p = state.pads.find(q => q.id === def.id);
+    if (p && def.builds) p.done = true;
+  }
+  for (const b of state.buildings) if (b.kind === 'tower') b.upgraded = true;
+  buildWalls(state, balance, 1);
+  state.unlocked = { barracks: true, taxTable: true, walls: true, tower: true };
   c.coins = w.carried;
   const saveMax = balance.archers.maxFollowers;
   balance.archers.maxFollowers = w.archers;

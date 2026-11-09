@@ -1,12 +1,15 @@
 // 유닛 그리기: 궁수 · 약탈자 · 방패 약탈자 · 바위 거인 (부위별 InstancedMesh) + 머리 위 체력 바
 import * as THREE from 'three';
 import { towerArcherOffset } from '../sim/combat.js';
+import { bakeParts, vcMaterial } from './merge.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
 /** 부위 목록 [{ geo, color, flat }] 으로 같은 모양 여러 개를 그리는 묶음. 부위 위치는 지오메트리에 미리 구워 둔다 */
 function makeRig(scene, parts, max, name, rigScale = 1) {
+  // 도형 부위들은 한 덩어리로 구워서 draw call 1번
+  if (!parts[0].material) parts = [{ geo: bakeParts(parts), material: vcMaterial(parts.every(p => p.flat)) }];
   const meshes = parts.map(pt => {
     const m = new THREE.InstancedMesh(pt.geo, pt.material || new THREE.MeshLambertMaterial({ color: pt.color, flatShading: !!pt.flat }), max);
     m.count = 0; m.castShadow = true; m.frustumCulled = false; m.name = name;

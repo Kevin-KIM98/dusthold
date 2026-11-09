@@ -2,7 +2,7 @@
 // 상태의 성벽 구성이 바뀔 때만 인스턴스를 다시 채운다.
 import * as THREE from 'three';
 
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _col = new THREE.Color();
 const POST_GAP = 0.36, POST_H = 2.0, MERLON_GAP = 0.9, STONE_H = 2.4;
 
 export function createWallView(scene, balance) {
@@ -61,6 +61,8 @@ export function createWallView(scene, balance) {
             posts.setMatrixAt(counts.posts, _m.compose(_p, _q.identity(), _s));
             _p.set(x, (h - 1) * POST_H, z); _s.set(1, 1, 1);
             tips.setMatrixAt(counts.posts, _m.compose(_p, _q, _s));
+            const v = 0.82 + (((i * 37 + Math.round(x * 13 + z * 7)) % 11) / 11) * 0.3; // 통나무마다 색 조금씩
+            posts.setColorAt(counts.posts, _col.setRGB(v, v * 0.97, v * 0.93));
             counts.posts++;
           }
         }
@@ -70,6 +72,7 @@ export function createWallView(scene, balance) {
     posts.count = tips.count = counts.posts;
     beams.count = counts.beams; doors.count = counts.doors; stone.count = counts.stone; merlons.count = counts.merlons;
     for (const m of [posts, tips, beams, doors, stone, merlons]) m.instanceMatrix.needsUpdate = true;
+    if (posts.instanceColor) posts.instanceColor.needsUpdate = true;
   }
 
   return {

@@ -11,7 +11,8 @@ const meshInfo = page => page.evaluate(() => {
   const by = {};
   __game.view.scene.traverse(o => {
     if (!o.isInstancedMesh || !o.name) return;
-    (by[o.name] = by[o.name] || []).push(o.geometry.attributes.position.count / (o.geometry.index ? 1 : 3) | 0);
+    // 도형은 꼭짓점 색으로 구운 한 덩어리(color 속성 있음), 모델은 color 속성 없음
+    (by[o.name] = by[o.name] || []).push(o.geometry.attributes.color ? 'shape' : 'model');
   });
   return by;
 });
@@ -21,7 +22,7 @@ test('아트 목록이 비어 있으면(기본) 전부 도형, 에러 0', { skip
   try {
     assert.deepEqual(await g.page.evaluate(() => __game.art), []);
     const by = await meshInfo(g.page);
-    assert.ok(by.archer.length >= 4 && by.raider.length >= 4, '도형 부위 여러 개');
+    assert.deepEqual([by.archer, by.raider, by.giant], [['shape'], ['shape'], ['shape']], '모두 도형');
     assert.deepEqual(g.errors, []);
   } finally { await g.close(); }
 });
@@ -39,9 +40,9 @@ test('모델·텍스처가 있으면 쓰고, 상한 초과·없는 파일은 그
     assert.match(line('giant'), /도형/);
     assert.match(line('grass'), /텍스처/);
     const by = await meshInfo(g.page);
-    assert.equal(by.raider.length, 1, '약탈자 = 모델 한 덩어리');
-    assert.ok(by.archer.length >= 4, '궁수는 도형 그대로');
-    assert.ok(by.giant.length >= 4, '거인은 도형 그대로');
+    assert.deepEqual(by.raider, ['model'], '약탈자 = 모델');
+    assert.deepEqual(by.archer, ['shape'], '궁수는 도형 그대로');
+    assert.deepEqual(by.giant, ['shape'], '거인은 도형 그대로');
     // 잔디 텍스처가 바닥 재질에 들어갔는지
     const grassMapped = await g.page.evaluate(() => {
       let ok = false;

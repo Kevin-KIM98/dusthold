@@ -9,15 +9,18 @@ import { createFx } from './fx.js';
 import { createUnitView } from './units.js';
 import { createWallView } from './walls.js';
 import { createGuideView } from './guide.js';
+import { bakeParts, bakeGroup, vcMaterial } from './merge.js';
+import { buildGrassGround, buildScatter, hash2 } from './decor.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
 const COLORS = {
-  sky: 0x9fc7d8, grass: 0x6f9e4c, grassDark: 0x4d7536, path: 0xcfb07a,
-  stone: 0xb9b2a4, stoneDark: 0x8d867a, roof: 0x3f6aa8, gate: 0x4a3524,
-  trunk: 0x6b4a2f, leaf: 0x3e7a3a, leaf2: 0x4f9145, rock: 0x8f8c86,
-  wool: 0xf2eee4, sheepFace: 0x3a3330, horn: 0xd9b45a, tunic: 0xa8362f,
-  skin: 0xe8b98f, helm: 0x9aa3ad, flag: 0xe0b23c,
+  sky: 0xa9d3e6, path: 0xd9bd86, pathEdge: 0x977850,
+  stone: 0xc9c1b0, stoneDark: 0x9a917f, stoneDeep: 0x7d7566, roof: 0x3d67b0, roofDark: 0x2f5293,
+  gate: 0x4a3524, window: 0x2b2a33, banner: 0x2f5fa8, gold: 0xe8bb3f,
+  trunk: 0x6b4a2f, pine: 0x2f6e3a, pine2: 0x3f8746, leafRound: 0x4f9a3e, leafRound2: 0x66ad4a, rock: 0x9a958c, rock2: 0x86827a,
+  wool: 0xf5f1e6, woolShade: 0xe3ddcf, sheepFace: 0x3a3330, hoof: 0x24201d, horn: 0xdcb45a,
+  tunic: 0x2f5fa8, cape: 0xb8332c, belt: 0x6b4423, skin: 0xedc099, helm: 0xc9cfd6, plume: 0xd8402f, saddle: 0x9c2f2a,
 };
 
 // 화면에서 잘 보이도록 모델만 키움 (충돌 반지름은 sim의 commander.radius)
@@ -30,13 +33,16 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, rcfg.maxPixelRatio));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // 색이 너무 바래지 않는 톤 매핑 + 살짝 밝게
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.sky);
   scene.fog = new THREE.Fog(COLORS.sky, 60, 120);
 
-  scene.add(new THREE.HemisphereLight(0xdfefff, 0x4a5a3a, 1.1));
-  const sun = new THREE.DirectionalLight(0xfff1d6, 2.0);
+  scene.add(new THREE.HemisphereLight(0xd6ecff, 0x5a6a3c, 1.25));
+  const sun = new THREE.DirectionalLight(0xffe4bd, 2.4); // 따뜻한 오후 햇빛
   sun.castShadow = true;
   sun.shadow.mapSize.set(rcfg.shadowMapSize, rcfg.shadowMapSize);
   const sc = sun.shadow.camera;
@@ -47,10 +53,11 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   const sunOffset = new THREE.Vector3(-14, 30, 10);
   scene.add(sun, sun.target);
 
-  buildGround(scene, balance.map, art);
+  buildGround(scene, balance, art);
   buildPaths(scene, state.paths, art);
   buildCastle(scene, state.castle, art);
   buildObstacles(scene, state.obstacles, art);
+  buildScatter(scene, state, balance);
   const commander = buildCommander(art);
   scene.add(commander);
   const coinView = createCoinView(scene, balance);
@@ -132,15 +139,15 @@ function texturedMat(art, name, color, repeat) {
   return new THREE.MeshLambertMaterial({ map: tex });
 }
 
-function buildGround(scene, map, art) {
+function buildGround(scene, balance, art) {
+  const map = balance.map;
+  if (!art.textures.grass) { buildGrassGround(scene, map, balance.walls.half); return; }
   const size = map.halfSize * 2;
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 4, size * 4),
-    new THREE.MeshLambertMaterial({ color: COLORS.grassDark }));
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 4, size * 4), new THREE.MeshLambertMaterial({ color: 0x3f6b30 }));
   outer.rotation.x = -Math.PI / 2;
   outer.position.y = -0.02;
   scene.add(outer);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
-    texturedMat(art, 'grass', COLORS.grass, size / 8));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), texturedMat(art, 'grass', 0x6f9e4c, size / 8));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -151,7 +158,9 @@ function buildPaths(scene, paths, art) {
     ? new THREE.MeshLambertMaterial({ map: art.textures.path.texture, side: THREE.DoubleSide })
     : new THREE.MeshLambertMaterial({ color: COLORS.path, side: THREE.DoubleSide });
   const uvScale = art.textures.path ? 1 / (4 * art.textures.path.repeat) : 0.25;
-  for (const p of paths) {
+  const edgeMat = new THREE.MeshLambertMaterial({ color: COLORS.pathEdge, side: THREE.DoubleSide });
+  // 가장자리 띠를 먼저(조금 넓고 낮게), 그 위에 길
+  for (const [list, m, y] of [[paths.map(p => ({ ...p, width: p.width + 1.0 })), edgeMat, 0.008], [paths, mat, 0.016]]) for (const p of list) {
     const pos = [];
     const idx = [];
     // 선분마다 사각형 + 꺾이는 점마다 원 → 하나의 지오메트리
@@ -184,8 +193,8 @@ function buildPaths(scene, paths, art) {
     // 아래를 향한 면이 있어도 보이도록 법선을 위로 고정
     const n = g.attributes.normal;
     for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
-    const mesh = new THREE.Mesh(g, mat);
-    mesh.position.y = 0.015;
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.y = y;
     mesh.receiveShadow = true;
     scene.add(mesh);
   }
@@ -201,28 +210,58 @@ function buildCastle(scene, castle, art) {
     scene.add(g);
     return;
   }
-  const stone = new THREE.MeshLambertMaterial({ color: COLORS.stone });
-  const stoneDark = new THREE.MeshLambertMaterial({ color: COLORS.stoneDark });
-  const roof = new THREE.MeshLambertMaterial({ color: COLORS.roof });
+  const M = c => new THREE.MeshLambertMaterial({ color: c });
+  const add = (geo, color, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, M(color)); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); return m; };
   const w = castle.halfWidth, d = castle.halfDepth;
-  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh; };
-
-  // 본관
-  add(new THREE.Mesh(new THREE.BoxGeometry(w * 1.5, 3.2, d * 1.5), stone), 0, 1.6, 0);
-  add(new THREE.Mesh(new THREE.ConeGeometry(w * 1.05, 2.2, 4), roof), 0, 4.3, 0).rotation.y = Math.PI / 4;
+  const merlons = (cx, cz, half, y, color) => { // 사각형 둘레 총안
+    const n = Math.max(3, Math.round(half * 2 / 0.6));
+    for (let i = 0; i < n; i++) {
+      const u = -half + (i + 0.5) * (half * 2 / n);
+      if (i % 2) continue;
+      for (const [x, z] of [[u, -half], [u, half], [-half, u], [half, u]]) add(new THREE.BoxGeometry(0.32, 0.35, 0.32), color, cx + x, y, cz + z);
+    }
+  };
+  // 받침돌
+  add(new THREE.BoxGeometry(w * 2 + 0.2, 0.4, d * 2 + 0.2), COLORS.stoneDeep, 0, 0.2, 0);
+  // 본관 + 위 총안
+  const kw = w * 0.78, kd = d * 0.78;
+  add(new THREE.BoxGeometry(kw * 2, 3.4, kd * 2), COLORS.stone, 0, 2.1, 0);
+  add(new THREE.BoxGeometry(kw * 2 + 0.2, 0.2, kd * 2 + 0.2), COLORS.stoneDark, 0, 3.85, 0);
+  merlons(0, 0, kw, 4.12, COLORS.stoneDark);
+  // 가운데 높은 탑 + 파란 지붕 + 금색 깃발
+  add(new THREE.CylinderGeometry(1.0, 1.1, 2.4, 10), COLORS.stone, 0, 5.0, 0);
+  add(new THREE.ConeGeometry(1.35, 1.9, 10), COLORS.roof, 0, 7.15, 0);
+  add(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 5), COLORS.stoneDeep, 0, 8.6, 0);
+  add(new THREE.BoxGeometry(0.85, 0.48, 0.04), COLORS.gold, 0.43, 8.95, 0);
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; add(new THREE.BoxGeometry(0.22, 0.5, 0.06), COLORS.window, Math.cos(a) * 1.02, 5.2, Math.sin(a) * 1.02, -a + Math.PI / 2); }
   // 네 모서리 탑
   const tr = Math.min(w, d) * 0.3;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const tx = sx * (w - tr), tz = sz * (d - tr);
-    add(new THREE.Mesh(new THREE.CylinderGeometry(tr, tr * 1.1, 4.4, 8), stoneDark), tx, 2.2, tz);
-    add(new THREE.Mesh(new THREE.ConeGeometry(tr * 1.3, 1.6, 8), roof), tx, 5.2, tz);
+    add(new THREE.CylinderGeometry(tr, tr * 1.12, 4.8, 10), COLORS.stoneDark, tx, 2.6, tz);
+    add(new THREE.CylinderGeometry(tr * 1.18, tr * 1.18, 0.35, 10), COLORS.stoneDeep, tx, 5.1, tz);
+    add(new THREE.ConeGeometry(tr * 1.3, 1.7, 10), COLORS.roof, tx, 6.1, tz);
+    add(new THREE.BoxGeometry(0.14, 0.45, 0.06), COLORS.window, tx + sx * 0.0, 3.4, tz + sz * tr * 1.02);
   }
-  // 성문 (남쪽 +z 면)
-  add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 0.2), new THREE.MeshLambertMaterial({ color: COLORS.gate })), 0, 0.9, d * 0.75 + 0.1);
-  // 깃발
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 6), stoneDark), 0, 6.1, 0);
-  add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.04), new THREE.MeshLambertMaterial({ color: COLORS.flag })), 0.45, 6.6, 0);
-  scene.add(g);
+  // 창문 (본관 네 면)
+  for (const u of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.34, 0.6, 0.06), COLORS.window, u * kw * 0.5, 2.9, kd + 0.03);
+    add(new THREE.BoxGeometry(0.34, 0.6, 0.06), COLORS.window, u * kw * 0.5, 2.9, -kd - 0.03);
+    add(new THREE.BoxGeometry(0.06, 0.6, 0.34), COLORS.window, kw + 0.03, 2.9, u * kd * 0.5);
+    add(new THREE.BoxGeometry(0.06, 0.6, 0.34), COLORS.window, -kw - 0.03, 2.9, u * kd * 0.5);
+  }
+  // 성문 (남쪽 +z): 돌 테두리 + 둥근 나무 문
+  add(new THREE.BoxGeometry(1.9, 2.3, 0.18), COLORS.stoneDeep, 0, 1.35, kd + 0.05);
+  add(new THREE.BoxGeometry(1.3, 1.5, 0.2), COLORS.gate, 0, 1.15, kd + 0.08);
+  const arch = new THREE.CylinderGeometry(0.65, 0.65, 0.2, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+  add(arch, COLORS.gate, 0, 1.9, kd + 0.08);
+  // 파란 깃발 두 장 (문 양옆)
+  for (const u of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.55, 1.5, 0.05), COLORS.banner, u * 1.35, 2.6, kd + 0.04);
+    add(new THREE.BoxGeometry(0.55, 0.12, 0.06), COLORS.gold, u * 1.35, 2.2, kd + 0.05);
+    add(new THREE.BoxGeometry(0.12, 0.12, 0.06), COLORS.gold, u * 1.35, 2.75, kd + 0.05);
+  }
+  scene.add(bakeGroup(g).group);
 }
 
 function buildObstacles(scene, obstacles, art) {
@@ -235,22 +274,42 @@ function buildObstacles(scene, obstacles, art) {
   if (rm) scene.add(makeInstanced(rm.geometry, rm.material, rItems0, { receiveShadow: true }));
   if (tm && rm) return;
 
-  const trunkGeo = new THREE.CylinderGeometry(0.18, 0.25, 1.2, 6);
-  trunkGeo.translate(0, 0.6, 0);
-  const crownGeo = new THREE.ConeGeometry(1.0, 1.8, 7);
-  crownGeo.translate(0, 1.9, 0);
-  const crownTopGeo = new THREE.ConeGeometry(0.7, 1.3, 7);
-  crownTopGeo.translate(0, 2.8, 0);
-  const items = tm ? [] : tItems;
-  scene.add(makeInstanced(trunkGeo, new THREE.MeshLambertMaterial({ color: COLORS.trunk }), items));
-  scene.add(makeInstanced(crownGeo, new THREE.MeshLambertMaterial({ color: COLORS.leaf, flatShading: true }), items));
-  scene.add(makeInstanced(crownTopGeo, new THREE.MeshLambertMaterial({ color: COLORS.leaf2, flatShading: true }), items));
-
-  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-  rockGeo.scale(1, 0.7, 1);
-  rockGeo.translate(0, 0.35, 0);
-  const rItems = rm ? [] : rocks.map(r => ({ x: r.x, z: r.z, rot: r.rot, sx: r.r, sy: r.r, sz: r.r }));
-  scene.add(makeInstanced(rockGeo, new THREE.MeshLambertMaterial({ color: COLORS.rock, flatShading: true }), rItems, { receiveShadow: true }));
+  const trunk = () => new THREE.CylinderGeometry(0.16, 0.24, 1.2, 6).translate(0, 0.6, 0);
+  const pineGeo = bakeParts([
+    { geo: trunk(), color: COLORS.trunk },
+    { geo: new THREE.ConeGeometry(1.05, 1.5, 7).translate(0, 1.6, 0), color: COLORS.pine, flat: true },
+    { geo: new THREE.ConeGeometry(0.82, 1.3, 7).translate(0, 2.35, 0), color: COLORS.pine2, flat: true },
+    { geo: new THREE.ConeGeometry(0.55, 1.0, 7).translate(0, 3.05, 0), color: COLORS.pine2, flat: true },
+  ]);
+  const roundGeo = bakeParts([
+    { geo: trunk(), color: COLORS.trunk },
+    { geo: new THREE.IcosahedronGeometry(1.0, 0).scale(1, 0.9, 1).translate(0, 1.95, 0), color: COLORS.leafRound, flat: true },
+    { geo: new THREE.IcosahedronGeometry(0.62, 0).translate(0.45, 2.55, 0.2), color: COLORS.leafRound2, flat: true },
+    { geo: new THREE.IcosahedronGeometry(0.55, 0).translate(-0.5, 2.35, -0.25), color: COLORS.leafRound2, flat: true },
+  ]);
+  const tint = (mesh, list, seedK) => {
+    const c = new THREE.Color();
+    list.forEach((o, i) => { const v = 0.85 + hash2(o.x * 3.1, o.z * 1.7 + seedK) * 0.3; mesh.setColorAt(i, c.setRGB(v, v * (0.95 + hash2(o.z, o.x) * 0.1), v)); });
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  };
+  if (!tm) {
+    const isPine = t => hash2(t.x * 0.37, t.z * 0.53) < 0.55;
+    const pines = trees.filter(isPine), rounds = trees.filter(t => !isPine(t));
+    const itemsOf = list => list.map(t => ({ x: t.x, z: t.z, rot: t.rot, sx: t.scale, sy: t.scale, sz: t.scale }));
+    const pm = makeInstanced(pineGeo, vcMaterial(true), itemsOf(pines)); tint(pm, pines, 1); scene.add(pm);
+    const rmh = makeInstanced(roundGeo, vcMaterial(true), itemsOf(rounds)); tint(rmh, rounds, 2); scene.add(rmh);
+  }
+  if (!rm) {
+    const rockGeo = bakeParts([
+      { geo: new THREE.DodecahedronGeometry(1, 0).scale(1, 0.7, 1).translate(0, 0.35, 0), color: COLORS.rock, flat: true },
+      { geo: new THREE.DodecahedronGeometry(0.45, 0).scale(1, 0.7, 1).translate(0.85, 0.15, 0.35), color: COLORS.rock2, flat: true },
+      { geo: new THREE.DodecahedronGeometry(0.3, 0).translate(-0.6, 0.1, 0.7), color: COLORS.rock2, flat: true },
+    ]);
+    const rItems = rocks.map(r => ({ x: r.x, z: r.z, rot: r.rot, sx: r.r, sy: r.r, sz: r.r }));
+    const mesh = makeInstanced(rockGeo, vcMaterial(true), rItems, { receiveShadow: true });
+    tint(mesh, rocks, 3);
+    scene.add(mesh);
+  }
 }
 
 // 성주: 뿔이 말린 양을 탄 기수. +z 방향을 바라보게 만든다.
@@ -265,25 +324,47 @@ function buildCommander(art) {
     return root; // 모델은 이미 맞춘 크기 (COMMANDER_SCALE 안 씀)
   }
   const mat = c => new THREE.MeshLambertMaterial({ color: c });
-  const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.castShadow = true; body.add(mesh); return mesh; };
+  const add = (geo, color, x, y, z) => { const mesh = new THREE.Mesh(geo, mat(color)); mesh.position.set(x, y, z); body.add(mesh); return mesh; };
 
-  const wool = add(new THREE.SphereGeometry(0.5, 10, 8), mat(COLORS.wool), 0, 0.62, -0.05);
-  wool.scale.set(1.0, 0.85, 1.35);
-  const legMat = mat(COLORS.sheepFace);
-  for (const lx of [-0.25, 0.25]) for (const lz of [-0.35, 0.3]) add(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 5), legMat, lx, 0.2, lz);
-  add(new THREE.BoxGeometry(0.34, 0.34, 0.42), legMat, 0, 0.82, 0.62);
-  const hornGeo = new THREE.TorusGeometry(0.14, 0.05, 5, 10, Math.PI * 1.6);
-  const hornMat = mat(COLORS.horn);
-  for (const s of [-1, 1]) {
-    const h = add(hornGeo, hornMat, s * 0.22, 0.9, 0.55);
-    h.rotation.y = Math.PI / 2;
+  // 뿔양: 몽글몽글 털 뭉치
+  add(new THREE.SphereGeometry(0.5, 12, 9), COLORS.wool, 0, 0.66, -0.05).scale.set(1.0, 0.82, 1.3);
+  for (const [x, y, z, r] of [[0.28, 0.78, 0.25, 0.26], [-0.28, 0.78, 0.25, 0.26], [0.3, 0.72, -0.35, 0.27], [-0.3, 0.72, -0.35, 0.27], [0, 0.95, -0.5, 0.24], [0, 0.6, 0.48, 0.24]]) {
+    add(new THREE.SphereGeometry(r, 8, 6), y > 0.75 ? COLORS.wool : COLORS.woolShade, x, y, z);
   }
-  // 기수
-  add(new THREE.CylinderGeometry(0.2, 0.26, 0.6, 8), mat(COLORS.tunic), 0, 1.25, -0.05);
-  add(new THREE.SphereGeometry(0.19, 10, 8), mat(COLORS.skin), 0, 1.7, -0.02);
-  add(new THREE.ConeGeometry(0.22, 0.32, 8), mat(COLORS.helm), 0, 1.92, -0.02);
-  // 등 뒤 안장 받침 (은화 탑이 여기 쌓인다)
-  add(new THREE.BoxGeometry(0.4, 0.08, 0.4), mat(COLORS.gate), 0, 0.98, -0.6);
+  add(new THREE.SphereGeometry(0.13, 6, 5), COLORS.wool, 0, 0.75, -0.75); // 꼬리
+  for (const lx of [-0.24, 0.24]) for (const lz of [-0.33, 0.3]) {
+    add(new THREE.CylinderGeometry(0.07, 0.065, 0.36, 6), COLORS.sheepFace, lx, 0.22, lz);
+    add(new THREE.CylinderGeometry(0.08, 0.08, 0.08, 6), COLORS.hoof, lx, 0.04, lz);
+  }
+  // 얼굴 + 귀 + 말린 뿔
+  add(new THREE.SphereGeometry(0.2, 10, 8), COLORS.sheepFace, 0, 0.86, 0.66).scale.set(0.9, 1.0, 1.2);
+  for (const s of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.16, 0.06, 0.08), COLORS.sheepFace, s * 0.2, 0.92, 0.58);
+    const horn = add(new THREE.TorusGeometry(0.15, 0.055, 6, 12, Math.PI * 1.7), COLORS.horn, s * 0.21, 0.98, 0.58);
+    horn.rotation.y = Math.PI / 2;
+    horn.rotation.z = s * 0.3;
+  }
+  // 안장 담요
+  add(new THREE.BoxGeometry(0.62, 0.06, 0.6), COLORS.saddle, 0, 1.12, -0.05);
+  add(new THREE.BoxGeometry(0.66, 0.03, 0.64), COLORS.gold, 0, 1.09, -0.05);
+  // 기수: 파란 옷 · 금색 띠 · 빨간 망토 · 투구와 깃털 · 작은 방패
+  add(new THREE.CylinderGeometry(0.19, 0.26, 0.6, 10), COLORS.tunic, 0, 1.43, -0.05);
+  add(new THREE.CylinderGeometry(0.255, 0.255, 0.07, 10), COLORS.belt, 0, 1.24, -0.05);
+  for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.06, 0.06, 0.42, 6), COLORS.tunic, s * 0.25, 1.45, 0.02).rotation.z = s * 0.25;
+  const cape = add(new THREE.BoxGeometry(0.46, 0.7, 0.04), COLORS.cape, 0, 1.36, -0.27);
+  cape.rotation.x = 0.25;
+  add(new THREE.SphereGeometry(0.18, 10, 8), COLORS.skin, 0, 1.88, -0.02);
+  add(new THREE.SphereGeometry(0.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), COLORS.helm, 0, 1.92, -0.02);
+  add(new THREE.ConeGeometry(0.07, 0.38, 6), COLORS.plume, 0, 2.2, -0.08).rotation.x = -0.4;
+  const shield = add(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 12), COLORS.banner, 0.34, 1.38, 0.08);
+  shield.rotation.z = Math.PI / 2;
+  const rim = add(new THREE.TorusGeometry(0.2, 0.025, 4, 14), COLORS.gold, 0.365, 1.38, 0.08);
+  rim.rotation.y = Math.PI / 2;
+  // 등 뒤 은화 받침 (은화 탑이 여기 쌓인다)
+  add(new THREE.BoxGeometry(0.4, 0.08, 0.4), COLORS.belt, 0, 0.98, -0.6);
+  const baked = bakeGroup(body, { receiveShadow: false });
+  root.remove(body);
+  root.add(baked.group);
   root.scale.setScalar(COMMANDER_SCALE);
   return root;
 }
