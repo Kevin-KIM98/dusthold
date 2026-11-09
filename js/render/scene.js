@@ -23,7 +23,8 @@ const COLORS = {
 // 화면에서 잘 보이도록 모델만 키움 (충돌 반지름은 sim의 commander.radius)
 const COMMANDER_SCALE = 1.25;
 
-export function createScene(state, balance, canvas) {
+/** art = loadAssets() 결과 (없으면 전부 도형) */
+export function createScene(state, balance, canvas, art = { models: {}, textures: {} }) {
   const rcfg = balance.render;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, rcfg.maxPixelRatio));
@@ -46,17 +47,17 @@ export function createScene(state, balance, canvas) {
   const sunOffset = new THREE.Vector3(-14, 30, 10);
   scene.add(sun, sun.target);
 
-  buildGround(scene, balance.map);
-  buildPaths(scene, state.paths);
-  buildCastle(scene, state.castle);
-  buildObstacles(scene, state.obstacles);
-  const commander = buildCommander();
+  buildGround(scene, balance.map, art);
+  buildPaths(scene, state.paths, art);
+  buildCastle(scene, state.castle, art);
+  buildObstacles(scene, state.obstacles, art);
+  const commander = buildCommander(art);
   scene.add(commander);
   const coinView = createCoinView(scene, balance);
   const padView = createPadView(scene, state);
-  const buildingView = createBuildingView(scene);
+  const buildingView = createBuildingView(scene, art);
   const fx = createFx(scene, balance);
-  const unitView = createUnitView(scene, balance);
+  const unitView = createUnitView(scene, balance, art);
   const wallView = createWallView(scene, balance);
   const guideView = createGuideView(scene, balance);
 
@@ -121,7 +122,17 @@ export function createScene(state, balance, canvas) {
   };
 }
 
-function buildGround(scene, map) {
+/** 텍스처가 있으면 반복 무늬로, 없으면 단색 */
+function texturedMat(art, name, color, repeat) {
+  const t = art.textures[name];
+  if (!t) return new THREE.MeshLambertMaterial({ color });
+  const tex = t.texture.clone();
+  tex.repeat.set(repeat * t.repeat, repeat * t.repeat);
+  tex.needsUpdate = true;
+  return new THREE.MeshLambertMaterial({ map: tex });
+}
+
+function buildGround(scene, map, art) {
   const size = map.halfSize * 2;
   const outer = new THREE.Mesh(new THREE.PlaneGeometry(size * 4, size * 4),
     new THREE.MeshLambertMaterial({ color: COLORS.grassDark }));
@@ -129,14 +140,17 @@ function buildGround(scene, map) {
   outer.position.y = -0.02;
   scene.add(outer);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
-    new THREE.MeshLambertMaterial({ color: COLORS.grass }));
+    texturedMat(art, 'grass', COLORS.grass, size / 8));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
 }
 
-function buildPaths(scene, paths) {
-  const mat = new THREE.MeshLambertMaterial({ color: COLORS.path, side: THREE.DoubleSide });
+function buildPaths(scene, paths, art) {
+  const mat = art.textures.path
+    ? new THREE.MeshLambertMaterial({ map: art.textures.path.texture, side: THREE.DoubleSide })
+    : new THREE.MeshLambertMaterial({ color: COLORS.path, side: THREE.DoubleSide });
+  const uvScale = art.textures.path ? 1 / (4 * art.textures.path.repeat) : 0.25;
   for (const p of paths) {
     const pos = [];
     const idx = [];
@@ -162,6 +176,9 @@ function buildPaths(scene, paths) {
     for (const pt of p.points) addDisc(pt);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const uv = [];
+    for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] * uvScale, pos[i + 2] * uvScale);
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     g.computeVertexNormals();
     // 아래를 향한 면이 있어도 보이도록 법선을 위로 고정
@@ -174,9 +191,16 @@ function buildPaths(scene, paths) {
   }
 }
 
-function buildCastle(scene, castle) {
+function buildCastle(scene, castle, art) {
   const g = new THREE.Group();
   g.position.set(castle.x, 0, castle.z);
+  if (art.models.castle) {
+    const m = new THREE.Mesh(art.models.castle.geometry, art.models.castle.material);
+    m.castShadow = m.receiveShadow = true;
+    g.add(m);
+    scene.add(g);
+    return;
+  }
   const stone = new THREE.MeshLambertMaterial({ color: COLORS.stone });
   const stoneDark = new THREE.MeshLambertMaterial({ color: COLORS.stoneDark });
   const roof = new THREE.MeshLambertMaterial({ color: COLORS.roof });
@@ -201,9 +225,15 @@ function buildCastle(scene, castle) {
   scene.add(g);
 }
 
-function buildObstacles(scene, obstacles) {
+function buildObstacles(scene, obstacles, art) {
   const trees = obstacles.filter(o => o.kind === 'tree');
   const rocks = obstacles.filter(o => o.kind === 'rock');
+  const tItems = trees.map(t => ({ x: t.x, z: t.z, rot: t.rot, sx: t.scale, sy: t.scale, sz: t.scale }));
+  const rItems0 = rocks.map(r => ({ x: r.x, z: r.z, rot: r.rot, sx: r.scale, sy: r.scale, sz: r.scale }));
+  const tm = art.models.tree, rm = art.models.rock;
+  if (tm) scene.add(makeInstanced(tm.geometry, tm.material, tItems));
+  if (rm) scene.add(makeInstanced(rm.geometry, rm.material, rItems0, { receiveShadow: true }));
+  if (tm && rm) return;
 
   const trunkGeo = new THREE.CylinderGeometry(0.18, 0.25, 1.2, 6);
   trunkGeo.translate(0, 0.6, 0);
@@ -211,7 +241,7 @@ function buildObstacles(scene, obstacles) {
   crownGeo.translate(0, 1.9, 0);
   const crownTopGeo = new THREE.ConeGeometry(0.7, 1.3, 7);
   crownTopGeo.translate(0, 2.8, 0);
-  const items = trees.map(t => ({ x: t.x, z: t.z, rot: t.rot, sx: t.scale, sy: t.scale, sz: t.scale }));
+  const items = tm ? [] : tItems;
   scene.add(makeInstanced(trunkGeo, new THREE.MeshLambertMaterial({ color: COLORS.trunk }), items));
   scene.add(makeInstanced(crownGeo, new THREE.MeshLambertMaterial({ color: COLORS.leaf, flatShading: true }), items));
   scene.add(makeInstanced(crownTopGeo, new THREE.MeshLambertMaterial({ color: COLORS.leaf2, flatShading: true }), items));
@@ -219,15 +249,21 @@ function buildObstacles(scene, obstacles) {
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   rockGeo.scale(1, 0.7, 1);
   rockGeo.translate(0, 0.35, 0);
-  const rItems = rocks.map(r => ({ x: r.x, z: r.z, rot: r.rot, sx: r.r, sy: r.r, sz: r.r }));
+  const rItems = rm ? [] : rocks.map(r => ({ x: r.x, z: r.z, rot: r.rot, sx: r.r, sy: r.r, sz: r.r }));
   scene.add(makeInstanced(rockGeo, new THREE.MeshLambertMaterial({ color: COLORS.rock, flatShading: true }), rItems, { receiveShadow: true }));
 }
 
 // 성주: 뿔이 말린 양을 탄 기수. +z 방향을 바라보게 만든다.
-function buildCommander() {
+function buildCommander(art) {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
+  if (art.models.commander) {
+    const m = new THREE.Mesh(art.models.commander.geometry, art.models.commander.material);
+    m.castShadow = true;
+    body.add(m);
+    return root; // 모델은 이미 맞춘 크기 (COMMANDER_SCALE 안 씀)
+  }
   const mat = c => new THREE.MeshLambertMaterial({ color: c });
   const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.castShadow = true; body.add(mesh); return mesh; };
 

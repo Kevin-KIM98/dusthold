@@ -6,9 +6,9 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vect
 const _up = new THREE.Vector3(0, 1, 0);
 
 /** 부위 목록 [{ geo, color, flat }] 으로 같은 모양 여러 개를 그리는 묶음. 부위 위치는 지오메트리에 미리 구워 둔다 */
-function makeRig(scene, parts, max, name) {
+function makeRig(scene, parts, max, name, rigScale = 1) {
   const meshes = parts.map(pt => {
-    const m = new THREE.InstancedMesh(pt.geo, new THREE.MeshLambertMaterial({ color: pt.color, flatShading: !!pt.flat }), max);
+    const m = new THREE.InstancedMesh(pt.geo, pt.material || new THREE.MeshLambertMaterial({ color: pt.color, flatShading: !!pt.flat }), max);
     m.count = 0; m.castShadow = true; m.frustumCulled = false; m.name = name;
     scene.add(m);
     return m;
@@ -21,7 +21,7 @@ function makeRig(scene, parts, max, name) {
         const it = items[i];
         _p.set(it.x, it.y || 0, it.z);
         _q.setFromAxisAngle(_up, it.angle);
-        _s.setScalar(it.scale || 1);
+        _s.setScalar((it.scale || 1) * rigScale);
         _m.compose(_p, _q, _s);
         for (const m of meshes) m.setMatrixAt(i, _m);
       }
@@ -90,13 +90,19 @@ const UNIT_SCALE = 1.25;
 const BAR_Y = { wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
 const BAR_W = { wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
 
-export function createUnitView(scene, balance) {
+export function createUnitView(scene, balance, art = { models: {} }) {
   const r = balance.render;
-  const archers = makeRig(scene, archerParts(), r.maxArchers, 'archer');
+  // 모델이 있으면 한 덩어리 모델(이미 맞춘 크기라 UNIT_SCALE을 되돌림), 없으면 도형 부위들
+  const rig = (slot, parts, max) => {
+    const m = art.models[slot];
+    return m ? makeRig(scene, [{ geo: m.geometry, material: m.material }], max, slot, 1 / UNIT_SCALE)
+      : makeRig(scene, parts, max, slot);
+  };
+  const archers = rig('archer', archerParts(), r.maxArchers);
   const enemies = {
-    raider: makeRig(scene, raiderParts(), r.maxEnemies, 'raider'),
-    shield: makeRig(scene, shieldParts(), r.maxEnemies, 'shield'),
-    giant: makeRig(scene, giantParts(), 8, 'giant'),
+    raider: rig('raider', raiderParts(), r.maxEnemies),
+    shield: rig('shield', shieldParts(), r.maxEnemies),
+    giant: rig('giant', giantParts(), 8),
   };
 
   // 체력 바: 배경 + 채움 (화면을 향하는 평면)

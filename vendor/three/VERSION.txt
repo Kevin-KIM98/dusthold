@@ -1,1 +1,2 @@
 three 0.187.0 (npm). three.module.js가 three.core.js를 import하므로 둘 다 필요.
+addons/ (GLTFLoader, BufferGeometryUtils, SkeletonUtils) — three 0.187.0 examples/jsm 그대로 복사

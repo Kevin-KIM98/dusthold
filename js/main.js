@@ -3,6 +3,7 @@ import { createState } from './sim/state.js';
 import { step } from './sim/rules.js';
 import { makeWorstScene } from './sim/debug.js';
 import { createScene } from './render/scene.js';
+import { loadAssets } from './render/assets.js';
 import { createFollowCamera } from './render/camera.js';
 import { createHud } from './render/hud.js';
 import { createControls } from './input/controls.js';
@@ -21,7 +22,11 @@ async function boot() {
   if (params.has('worst')) makeWorstScene(state, balance);
   const canvas = document.getElementById('game');
   const ui = document.getElementById('ui');
-  const view = createScene(state, balance, canvas);
+  // M6 아트: ?noart = 도형만, ?assets=다른목록.json = 다른 아트 목록
+  const artCfg = balance.render.art;
+  const art = params.has('noart') ? { models: {}, textures: {}, report: [] }
+    : await loadAssets(params.get('assets') || artCfg.manifest, artCfg);
+  const view = createScene(state, balance, canvas, art);
   const cam = createFollowCamera(balance.camera, innerWidth / innerHeight);
   const controls = createControls(canvas, document.getElementById('joy'), balance);
 
@@ -72,7 +77,7 @@ async function boot() {
   requestAnimationFrame(frame);
 
   // 디버그·테스트용 (게임 규칙에는 영향 없음)
-  window.__game = { state, balance, camera: cam, view, sound, isPaused: () => paused, ready: true, inputOverride: null };
+  window.__game = { state, balance, camera: cam, view, sound, art: art.report, isPaused: () => paused, ready: true, inputOverride: null };
 }
 
 boot().catch(err => {

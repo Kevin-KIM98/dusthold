@@ -1,0 +1,25 @@
+{
+  "models": {
+    "raider": {
+      "file": "box.glb"
+    },
+    "tree": {
+      "file": "cone.glb"
+    },
+    "castle": {
+      "file": "box.glb"
+    },
+    "archer": {
+      "file": "heavy.glb"
+    },
+    "giant": {
+      "file": "missing.glb"
+    }
+  },
+  "textures": {
+    "grass": {
+      "file": "grass.png",
+      "repeat": 1
+    }
+  }
+}

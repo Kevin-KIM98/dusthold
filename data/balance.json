@@ -128,7 +128,67 @@
     "maxArrows": 40,
     "arrowSeconds": 0.18,
     "damageNumberSeconds": 0.8,
-    "maxWallPosts": 400
+    "maxWallPosts": 400,
+    "art": {
+      "manifest": "assets/manifest.json",
+      "maxUnitTriangles": 1500,
+      "maxPropTriangles": 3000,
+      "maxBuildingTriangles": 20000,
+      "unitSlots": [
+        "archer",
+        "raider",
+        "shield",
+        "giant"
+      ],
+      "propSlots": [
+        "tree",
+        "rock"
+      ],
+      "buildingSlots": [
+        "castle",
+        "barracks",
+        "taxTable",
+        "tower"
+      ],
+      "heroSlots": [
+        "commander"
+      ],
+      "defaultFit": {
+        "commander": {
+          "height": 2.4
+        },
+        "archer": {
+          "height": 1.5
+        },
+        "raider": {
+          "height": 1.5
+        },
+        "shield": {
+          "height": 1.6
+        },
+        "giant": {
+          "height": 3.4
+        },
+        "tree": {
+          "height": 3.6
+        },
+        "rock": {
+          "height": 1.0
+        },
+        "castle": {
+          "width": 7.6
+        },
+        "barracks": {
+          "width": 3.4
+        },
+        "taxTable": {
+          "width": 1.7
+        },
+        "tower": {
+          "width": 2.2
+        }
+      }
+    }
   },
   "coins": {
     "carryMax": 100,

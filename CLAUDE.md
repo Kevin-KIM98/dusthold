@@ -51,7 +51,9 @@ index.html  css/  data/balance.json  vendor/three/
 js/main.js  js/strings.js
 js/sim/      state · rng · commander · coins · pads · units · combat · waves · rules
 js/render/   scene · camera · instanced · hud · fx
-js/input/    joystick · keyboard
+js/input/    joystick · keyboard · controls
+js/audio/    sound (Web Audio 합성 효과음)
+assets/      manifest.json + models/ textures/ (M6 아트, 목록에 적힌 것만 불러옴)
 tests/       *.test.js (node --test 기본 패턴)
 design/      plan.md · progress.md · unity-port.md
 unity/       (Unity 단계에서 생성)

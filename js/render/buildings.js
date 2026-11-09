@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const C = { stone: 0x9a948a, wood: 0x8a5a34, woodDark: 0x5e3b22, roof: 0xb4432f, straw: 0xd9b36a, target: 0xf3efe2, red: 0xc4342b, cloth: 0x2f5f9e, gold: 0xe0b23c };
 const POP_SECONDS = 0.45;
 
-export function createBuildingView(scene) {
+export function createBuildingView(scene, art = { models: {} }) {
   const made = new Map();
   const mat = c => new THREE.MeshLambertMaterial({ color: c });
   const M = Object.fromEntries(Object.entries(C).map(([k, v]) => [k, mat(v)]));
@@ -70,12 +70,31 @@ export function createBuildingView(scene) {
     },
   };
 
+  // 모델이 있는 건물: 모델 + (망루면) 강화 깃발
+  function modelBuilding(b) {
+    const g = new THREE.Group();
+    const md = art.models[b.kind];
+    const mesh = new THREE.Mesh(md.geometry, md.material);
+    mesh.castShadow = mesh.receiveShadow = true;
+    g.add(mesh);
+    if (b.kind === 'tower') {
+      const top = md.geometry.boundingBox ? md.geometry.boundingBox.max.y : 6;
+      const flag = new THREE.Group();
+      flag.name = 'upgrade';
+      part(flag, new THREE.CylinderGeometry(0.04, 0.04, 1.2, 5), M.woodDark, 0, top + 0.6, 0);
+      part(flag, new THREE.BoxGeometry(0.7, 0.4, 0.04), M.gold, 0.35, top + 0.95, 0);
+      flag.visible = false;
+      g.add(flag);
+    }
+    return g;
+  }
+
   return {
     sync(state, time) {
       for (const b of state.buildings) {
         let v = made.get(b.id);
         if (!v) {
-          const g = (builders[b.kind] || builders.barracks)(b);
+          const g = art.models[b.kind] ? modelBuilding(b) : (builders[b.kind] || builders.barracks)(b);
           g.position.set(b.x, 0, b.z);
           scene.add(g);
           v = { g, born: time };
