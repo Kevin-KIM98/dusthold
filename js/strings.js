@@ -20,5 +20,7 @@ export const STR = {
   waveStart: n => `웨이브 ${n} 시작!`,
   castle: '성채',
   down: s => `쓰러졌어요! ${s}초 뒤 부활`,
+  mute: '소리 끄기',
+  unmute: '소리 켜기',
   hintMove: '화면을 누르고 끌어서 이동 · PC는 WASD',
 };

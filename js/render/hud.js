@@ -5,12 +5,25 @@ import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
 
 const _v = new THREE.Vector3();
 
-export function createHud(root, balance, { showFps, onPause, onRestart }) {
+export function createHud(root, balance, { showFps, onPause, onRestart, sound }) {
   const pauseBtn = document.createElement('button');
   pauseBtn.className = 'ui btn pause';
   pauseBtn.setAttribute('aria-label', STR.pause);
   pauseBtn.textContent = 'Ⅱ';
   root.appendChild(pauseBtn);
+
+  // 음소거 버튼 (일시정지 아래)
+  const muteBtn = document.createElement('button');
+  muteBtn.className = 'ui btn mute';
+  const drawMute = () => {
+    const m = sound.isMuted();
+    muteBtn.textContent = m ? '🔇' : '🔊';
+    muteBtn.setAttribute('aria-label', m ? STR.unmute : STR.mute);
+    muteBtn.setAttribute('aria-pressed', String(m));
+  };
+  muteBtn.addEventListener('click', () => { sound.setMuted(!sound.isMuted()); drawMute(); });
+  drawMute();
+  root.appendChild(muteBtn);
 
   const overlay = document.createElement('div');
   overlay.className = 'ui overlay hidden';

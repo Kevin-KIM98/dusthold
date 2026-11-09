@@ -3,7 +3,7 @@
 뿔양 탄 성주로 은화를 모아 기지를 키우고, 몰려오는 약탈단과 거인을 막는 디펜스 게임.
 브라우저 프로토타입으로 먼저 만들고, 이후 Unity로 옮긴다.
 
-**바로 하기 (폰·PC):** https://kevin-kim98.github.io/dusthold/ (M4: 성벽·망루·승패까지 — 한 판 끝까지 플레이 가능)
+**바로 하기 (폰·PC):** https://kevin-kim98.github.io/dusthold/ (M5: 효과음·바닥 안내까지 — 한 판 끝까지 플레이 가능)
 
 - 기획서: [design/plan.md](design/plan.md) — 승인됨 (2026-11-09)
 - 진행 로그: [design/progress.md](design/progress.md)

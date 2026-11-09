@@ -8,6 +8,7 @@ import { createBuildingView } from './buildings.js';
 import { createFx } from './fx.js';
 import { createUnitView } from './units.js';
 import { createWallView } from './walls.js';
+import { createGuideView } from './guide.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 
@@ -57,6 +58,7 @@ export function createScene(state, balance, canvas) {
   const fx = createFx(scene, balance);
   const unitView = createUnitView(scene, balance);
   const wallView = createWallView(scene, balance);
+  const guideView = createGuideView(scene, balance);
 
   // sim 이벤트 → 날아가는 은화 연출
   function playEvents(st, events) {
@@ -111,6 +113,7 @@ export function createScene(state, balance, canvas) {
       padView.sync(st, now);
       coinView.sync(st, commander, now);
       unitView.sync(st, alpha, now, camera, commander.position);
+      guideView.sync(st, commander.position, now);
       if (events.length) playEvents(st, events);
       fx.update(dt);
     },

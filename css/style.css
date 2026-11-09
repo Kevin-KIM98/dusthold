@@ -23,6 +23,9 @@ html, body {
 .btn.pause {
   position: absolute; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 12px; width: 48px; height: 48px;
 }
+.btn.mute {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 68px); right: 12px; width: 48px; height: 48px; font-size: 20px;
+}
 .btn.wide { width: 100%; padding: 12px 20px; background: #3f6aa8; font-size: 18px; }
 
 .overlay { position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: grid; place-items: center; }
@@ -71,7 +74,7 @@ html, body {
 .wave-bar i { display: block; height: 100%; width: 0; background: #e0453a; }
 .wave-t { font-size: 11px; opacity: .85; }
 .castle-hp {
-  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 70px); left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 72px); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.6);
 }
 .hpbar { width: 140px; height: 10px; border-radius: 5px; background: rgba(0,0,0,.45); overflow: hidden; border: 1px solid rgba(255,255,255,.5); }

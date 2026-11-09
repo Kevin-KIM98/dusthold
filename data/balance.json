@@ -384,5 +384,21 @@
     "range": 8,
     "upgradeMultiplier": 1.5,
     "platformHeight": 3.2
+  },
+  "sound": {
+    "volume": 0.6
+  },
+  "guide": {
+    "order": [
+      "barracks",
+      "taxTable",
+      "recruit",
+      "walls",
+      "tower1"
+    ],
+    "arrowSpacing": 1.3,
+    "arrowStart": 1.4,
+    "maxArrows": 14,
+    "hideWithin": 1.6
   }
 }

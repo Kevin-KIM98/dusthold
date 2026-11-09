@@ -7,6 +7,7 @@ import { createFollowCamera } from './render/camera.js';
 import { createHud } from './render/hud.js';
 import { createControls } from './input/controls.js';
 import { STR } from './strings.js';
+import { createSound } from './audio/sound.js';
 
 const params = new URLSearchParams(location.search);
 const DEFAULT_SEED = 1;
@@ -25,7 +26,8 @@ async function boot() {
   const controls = createControls(canvas, document.getElementById('joy'), balance);
 
   let paused = false;
-  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: () => location.reload() });
+  const sound = createSound(balance.sound);
+  const hud = createHud(ui, balance, { showFps: params.has('worst'), onPause: p => { paused = p; }, onRestart: () => location.reload(), sound });
 
   function resize() {
     view.renderer.setSize(innerWidth, innerHeight, false);
@@ -46,7 +48,8 @@ async function boot() {
       acc += dt * speed;
       let n = 0;
       while (acc >= TICK && n < balance.sim.maxTicksPerFrame) {
-        lastInput = controls.read();
+        // 테스트용: __game.inputOverride가 있으면 그 입력을 씀 (자동 플레이)
+        lastInput = window.__game && window.__game.inputOverride ? window.__game.inputOverride() : controls.read();
         if (lastInput.x || lastInput.z) hud.hideHint();
         step(state, lastInput, balance);
         for (const e of state.events) events.push(e);
@@ -60,6 +63,7 @@ async function boot() {
     cam.update(fx, fz, dt);
     view.sync(state, alpha, cam.target, events, now / 1000, dt, cam.camera);
     hud.sync(state, cam.camera, events, dt);
+    sound.events(events);
     events.length = 0;
     view.renderer.render(view.scene, cam.camera);
     hud.frame(dt);
@@ -68,7 +72,7 @@ async function boot() {
   requestAnimationFrame(frame);
 
   // 디버그·테스트용 (게임 규칙에는 영향 없음)
-  window.__game = { state, balance, camera: cam, view, isPaused: () => paused, ready: true };
+  window.__game = { state, balance, camera: cam, view, sound, isPaused: () => paused, ready: true, inputOverride: null };
 }
 
 boot().catch(err => {
