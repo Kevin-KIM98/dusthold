@@ -1,93 +1,21 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#14181c">
-  <title>DUSTHOLD</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>새 게임 — 준비 중</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1d2a1f; color: #f3ead2;
+    font-family: system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  main { height: 100%; display: grid; place-content: center; text-align: center; padding: 0 16px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  p { margin: 0; opacity: .75; }
+</style>
 </head>
 <body>
-  <!-- 타이틀 -->
-  <section id="title" class="screen">
-    <canvas id="title-art" aria-hidden="true"></canvas>
-    <div class="title-head">
-      <h1 id="title-name">DUSTHOLD</h1>
-      <p id="title-sub"></p>
-    </div>
-    <div class="title-buttons">
-      <button id="btn-continue" class="btn primary" type="button" hidden></button>
-      <button id="btn-new" class="btn" type="button"></button>
-    </div>
-  </section>
-
-  <!-- 게임 -->
-  <main id="game" class="screen" hidden>
-    <header id="hud">
-      <div id="topbar" aria-label="자원"></div>
-      <div id="clockbar">
-        <span id="clk-phase" class="phase" data-phase="day"></span>
-        <span id="clk-day"></span>
-        <span id="clk-time"></span>
-        <span id="clk-count" class="count"></span>
-        <div id="speed" role="group">
-          <button class="btn sm pause" type="button" data-speed="pause"></button>
-          <button class="btn sm" type="button" data-speed="1"></button>
-          <button class="btn sm" type="button" data-speed="2"></button>
-          <button class="btn sm" type="button" data-speed="3"></button>
-        </div>
-      </div>
-    </header>
-
-    <section id="stage">
-      <canvas id="view"></canvas>
-      <div id="night-veil" aria-hidden="true"></div>
-      <div id="log-view" hidden></div>
-      <div id="debug" hidden></div>
-      <div id="toasts" aria-live="polite"></div>
-      <div id="missions" hidden>
-        <button id="ms-head" type="button" aria-expanded="true">
-          <span id="ms-title"></span><span id="ms-summary"></span><span class="chev"></span>
-        </button>
-        <div id="ms-body"></div>
-      </div>
-      <div id="guide" hidden>
-        <div class="gd-text">
-          <p id="gd-title"></p>
-          <p id="gd-body"></p>
-          <p id="gd-extra"></p>
-        </div>
-        <button id="gd-skip" class="btn sm" type="button"></button>
-      </div>
-    </section>
-
-    <section id="panel" class="collapsed">
-      <button id="panel-toggle" class="panel-head" type="button">
-        <span id="panel-title"></span>
-        <span class="chev"></span>
-      </button>
-      <div id="panel-body"></div>
-    </section>
-
-    <nav id="tabs">
-      <button class="tab active" type="button" data-tab="surface"></button>
-      <button class="tab" type="button" data-tab="bunker"></button>
-      <button class="tab" type="button" data-tab="log"></button>
-    </nav>
-  </main>
-
-
-  <!-- 결과·힌트 카드 -->
-  <div id="overlay" hidden>
-    <div class="ov-card" role="dialog" aria-modal="true" aria-labelledby="ov-title">
-      <h2 id="ov-title"></h2>
-      <p id="ov-sub"></p>
-      <dl id="ov-stats"></dl>
-      <div id="ov-buttons"></div>
-    </div>
-  </div>
-
-  <script type="module" src="js/main.js"></script>
+<main>
+  <h1>새 게임 준비 중</h1>
+  <p>곧 여기서 플레이할 수 있어요.</p>
+</main>
 </body>
 </html>
