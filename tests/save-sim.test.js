@@ -46,12 +46,13 @@ test('쓸 수 없는 저장은 버린다: 망가진 데이터·버전 다름·�
   assert.equal(deserialize(serialize(a, B), B), null, '끝난 판은 이어하지 않음');
 });
 
-test('요약: 웨이브·은화·진행 시간', () => {
+test('요약: 스테이지·점령한 적 기지·은화', () => {
   const a = createState(B, 1);
-  a.commander.coins = 12; a.waves.current = 3;
+  a.commander.coins = 12; a.camps[0].captured = true;
   for (let i = 0; i < 40; i++) step(a, { x: 0, z: 0 }, B);
   const s = summary(a);
   assert.equal(s.coins, 12);
-  assert.equal(s.wave, 3);
-  assert.ok(s.time > 1.9);
+  assert.equal(s.captured, 1);
+  assert.equal(s.camps, 2);
+  assert.equal(s.stage, 1);
 });

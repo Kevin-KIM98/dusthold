@@ -22,7 +22,7 @@ const instCount = cap => page.evaluate(cap => {
 }, cap);
 
 test('성벽 패드를 해금하면 목책과 성문이 나타나고 망루 패드가 열린다', { skip }, async () => {
-  await page.evaluate(() => { const s = __game.state; s.waves.paused = true; s.unlocked.barracks = s.unlocked.taxTable = true; s.commander.coins = 100; });
+  await page.evaluate(() => { const s = __game.state; s.spawn.paused = true; s.unlocked.barracks = s.unlocked.taxTable = true; s.commander.coins = 100; });
   await page.waitForTimeout(200);
   assert.equal(await padVisible('walls'), true, '성벽 패드 보임');
   const p = await page.evaluate(() => __game.state.pads.find(p => p.id === 'walls'));
@@ -83,7 +83,7 @@ test('성채 체력이 0이면 패배 화면이 뜬다', { skip }, async () => {
   await page.evaluate(() => { __game.state.castle.hp = 0; });
   await page.waitForSelector('.result:not(.hidden)', { timeout: 5000 });
   assert.equal(await page.$eval('.result .r-title', el => el.textContent), '성채가 무너졌어요');
-  assert.match(await page.$eval('.result .r-wave', el => el.textContent), /버틴 웨이브 \d+\/10/);
+  assert.match(await page.$eval('.result .r-wave', el => el.textContent), /버틴 시간 \d+분 \d+초/);
   await page.screenshot({ path: join(ROOT, 'test-results/m4-lose.png') });
 });
 
@@ -93,22 +93,22 @@ test('"다시 하기"를 누르면 처음 상태로 돌아간다', { skip }, asy
   const castleHp = await page.evaluate(() => __game.balance.castle.hp);
   const s = await page.evaluate(() => ({
     result: __game.state.result, buildings: __game.state.buildings.length, walls: __game.state.walls.length,
-    coins: __game.state.coins.length, castle: __game.state.castle.hp, wave: __game.state.waves.current, carried: __game.state.commander.coins,
+    coins: __game.state.coins.length, castle: __game.state.castle.hp, wave: __game.state.camps.filter(c => c.captured).length, carried: __game.state.commander.coins,
   }));
   assert.deepEqual(s, { result: null, buildings: 0, walls: 0, coins: 25, castle: castleHp, wave: 0, carried: 0 });
   assert.equal(await page.$eval('.result', el => el.classList.contains('hidden')), true);
 });
 
-test('웨이브 10의 적을 다 잡으면 승리 화면이 뜬다', { skip }, async () => {
-  await page.evaluate(() => { const s = __game.state; s.waves.current = __game.balance.waves.total; s.enemies = []; s.waves.queue = []; });
+test('적 기지를 모두 점령하면 클리어 화면이 뜬다', { skip }, async () => {
+  await page.evaluate(() => { for (const c of __game.state.camps) c.hp = 0; });
   await page.waitForSelector('.result:not(.hidden)', { timeout: 5000 });
   assert.equal(await page.$eval('.result .r-title', el => el.textContent), '스테이지 1 클리어!');
-  assert.equal(await page.$eval('.result .r-wave', el => el.textContent), '버틴 웨이브 10/10');
+  assert.equal(await page.$eval('.result .r-wave', el => el.textContent), '적 기지 2곳 점령');
   await page.screenshot({ path: join(ROOT, 'test-results/m4-win.png') });
   assert.deepEqual(errors, []);
 });
 
-test('클리어 화면에서 "다음 판" → 스테이지 2: 건물·은화 그대로, 웨이브 처음부터, 성채 가득', { skip }, async () => {
+test('클리어 화면에서 "다음 판" → 스테이지 2: 건물·은화 그대로, 적 기지 새로, 성채 가득', { skip }, async () => {
   const before = await page.evaluate(() => {
     const s = __game.state;
     s.castle.hp = 100; s.commander.coins = 42;
@@ -117,7 +117,7 @@ test('클리어 화면에서 "다음 판" → 스테이지 2: 건물·은화 그
   await page.click('.result .r-next');
   await page.waitForFunction(() => __game.state.stage === 2 && !__game.state.result, null, { timeout: 5000 });
   const after = await page.evaluate(() => ({
-    built: __game.state.buildings.length, coins: __game.state.commander.coins, wave: __game.state.waves.current,
+    built: __game.state.buildings.length, coins: __game.state.commander.coins, wave: __game.state.camps.filter(c => c.captured).length,
     castle: __game.state.castle.hp, max: __game.state.castle.maxHp,
     label: document.querySelector('.wave-s').textContent, waveText: document.querySelector('.wave-n').textContent,
     hidden: document.querySelector('.result').classList.contains('hidden'),
@@ -127,7 +127,7 @@ test('클리어 화면에서 "다음 판" → 스테이지 2: 건물·은화 그
   assert.equal(after.wave, 0);
   assert.equal(after.castle, after.max, '성채 정비');
   assert.equal(after.label, '스테이지 2');
-  assert.equal(after.waveText, '웨이브 0/10');
+  assert.equal(after.waveText, '적 기지 점령 0/2');
   assert.equal(after.hidden, true, '결과 화면 닫힘');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(ROOT, 'test-results/stage2.png') });

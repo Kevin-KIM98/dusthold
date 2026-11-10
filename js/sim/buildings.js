@@ -40,3 +40,19 @@ export function updateBuildings(state, balance) {
     }
   }
 }
+
+/**
+ * 건물이 부서짐 (2026-11-10): 그 자리에 패드가 다시 열리고 처음 비용의 절반으로 재건.
+ * 같은 종류 건물이 하나도 안 남으면 해금 표시도 꺼서, 그 건물이 필요한 패드(예: 궁수 모집)는 다시 닫힌다.
+ */
+export function destroyBuilding(state, b, balance) {
+  state.buildings = state.buildings.filter(o => o !== b);
+  if (!state.buildings.some(o => o.kind === b.kind)) state.unlocked[b.kind] = false;
+  const def = balance.pads.list.find(d => d.builds === b.kind && Math.abs(d.x - b.x) < 1e-6 && Math.abs(d.z - b.z) < 1e-6);
+  if (def) {
+    const pad = state.pads.find(p => p.id === def.id);
+    pad.done = false; pad.rebuild = true; pad.paid = 0; pad.payAcc = 0;
+    pad.cost = Math.ceil(def.cost * balance.buildings.rebuildCostFactor);
+  }
+  state.events.push({ type: 'buildingDown', kind: b.kind, id: b.id, x: b.x, z: b.z });
+}

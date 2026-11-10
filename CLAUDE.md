@@ -49,8 +49,8 @@
 ```
 index.html  css/  data/balance.json  vendor/three/
 js/main.js  js/strings.js  js/storage.js (이어하기: 이 브라우저에만 저장)
-js/sim/      state · rng · commander · coins · pads · units · combat · waves · rules · save
-js/render/   scene · camera · instanced · hud · fx
+js/sim/      state · rng · commander · coins · pads · units · combat · camps(적 기지) · stages · scale · rules · save
+js/render/   scene · camera · instanced · hud · fx · camps · units · buildings · walls · decor · guide
 js/input/    joystick · keyboard · controls
 js/audio/    sound (Web Audio 합성 효과음)
 assets/      manifest.json + models/ textures/ (M6 아트, 목록에 적힌 것만 불러옴)

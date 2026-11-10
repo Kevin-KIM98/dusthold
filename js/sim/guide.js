@@ -12,7 +12,17 @@ export function guideTarget(state, balance) {
     pad = p;
     break;
   }
-  if (!pad || !pad.open) return null;
+  if (!pad) {
+    // 튜토리얼이 끝나면: 가장 가까운 적 기지로 (점령하러 가기)
+    let camp = null, cd = Infinity;
+    for (const k of state.camps || []) {
+      if (k.captured) continue;
+      const d = Math.hypot(k.x - c.x, k.z - c.z);
+      if (d < cd) { cd = d; camp = k; }
+    }
+    return camp ? { x: camp.sx, z: camp.sz, kind: 'camp', id: camp.id } : null;
+  }
+  if (!pad.open) return null;
   const need = pad.cost - pad.paid;
   if (c.coins >= need || pad.payAcc > 0) return { x: pad.x, z: pad.z, kind: 'pad', id: pad.id };
   // 은화가 모자라면: 가까운 바닥 은화 → 세금 탁자(쌓여 있으면) → 그래도 패드

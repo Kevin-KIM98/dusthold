@@ -4,15 +4,15 @@ import { moveCommander } from './commander.js';
 import { updateCoins } from './coins.js';
 import { updatePads, refreshPads } from './pads.js';
 import { updateBuildings } from './buildings.js';
-import { updateWaves } from './waves.js';
-import { updateArchers, updateEnemies, spawnEnemy } from './units.js';
-import { updateCombat } from './combat.js';
+import { updateCamps } from './camps.js';
+import { updateArchers, updateEnemies } from './units.js';
+import { updateCombat, dropEnemyCoins } from './combat.js';
 
 export function step(state, input, balance) {
   state.events = [];
   if (state.result) return; // 끝난 판은 멈춤
   moveCommander(state, input, balance);
-  updateWaves(state, balance, spawnEnemy);
+  updateCamps(state, balance);
   updateArchers(state, balance);
   updateEnemies(state, balance);
   updateCombat(state, balance);
@@ -25,10 +25,14 @@ export function step(state, input, balance) {
   state.time = state.tick * balance.sim.tickSeconds;
 }
 
-/** 승리: 마지막 웨이브까지 다 나오고 적이 모두 처치됨. 패배: 성채 체력 0 */
+/** 승리: 적 기지를 모두 점령 (남은 적은 은화로). 패배: 성채 체력 0 */
 export function checkResult(state, balance) {
   if (state.result) return;
   if (state.castle.hp <= 0) state.result = 'lose';
-  else if (state.waves.current >= balance.waves.total && state.waves.queue.length === 0 && state.enemies.length === 0) state.result = 'win';
-  if (state.result) state.events.push({ type: 'gameOver', result: state.result, wave: state.waves.current });
+  else if (state.camps.length && state.camps.every(c => c.captured)) {
+    state.result = 'win';
+    for (const e of state.enemies) dropEnemyCoins(state, e, balance); // 은화 폭발
+    state.enemies = [];
+  }
+  if (state.result) state.events.push({ type: 'gameOver', result: state.result, stage: state.stage });
 }

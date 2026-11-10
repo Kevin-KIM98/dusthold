@@ -71,7 +71,7 @@ html, body {
 }
 .wave-n { font-size: 16px; font-weight: 800; }
 .wave-bar { height: 6px; margin: 4px 0 2px; border-radius: 3px; background: rgba(255,255,255,.2); overflow: hidden; }
-.wave-bar i { display: block; height: 100%; width: 0; background: #e0453a; }
+.wave-bar i { display: block; height: 100%; width: 0; background: #5fb4ff; }
 .wave-t { font-size: 11px; opacity: .85; }
 .castle-hp {
   position: absolute; top: calc(env(safe-area-inset-top, 0px) + 72px); left: 50%; transform: translateX(-50%);

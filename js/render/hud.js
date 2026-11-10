@@ -1,7 +1,7 @@
 // 화면 위 UI (일시정지 버튼, 디버그 FPS, 안내 문구)
 import * as THREE from 'three';
 import { STR } from '../strings.js';
-import { secondsToNextWave, waveStartSeconds } from '../sim/waves.js';
+import { stageSeconds } from '../sim/camps.js';
 
 const _v = new THREE.Vector3();
 
@@ -130,7 +130,7 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
   if (resumeInfo) {
     const box = document.createElement('div');
     box.className = 'ui overlay resume';
-    box.innerHTML = `<div class="panel"><h2>${STR.resumeTitle}</h2><p class="r-info">${STR.resumeInfo(resumeInfo.stage, resumeInfo.wave, resumeInfo.coins)}</p>`
+    box.innerHTML = `<div class="panel"><h2>${STR.resumeTitle}</h2><p class="r-info">${STR.resumeInfo(resumeInfo.stage, resumeInfo.captured, resumeInfo.camps, resumeInfo.coins)}</p>`
       + `<button class="btn wide r-go">${STR.continueSave}</button><button class="btn wide ghost r-new">${STR.newGame}</button></div>`;
     root.appendChild(box);
     box.querySelector('.r-go').addEventListener('click', () => { box.remove(); onResume(); });
@@ -148,24 +148,19 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
         lastCoins = k;
       }
       const w = innerWidth, h = innerHeight;
-      const total = balance.waves.total;
+      // 스테이지 · 적 기지 점령 수 · 막대 = 남은 기지 체력 합 (점령에 가까울수록 참)
+      const total = state.camps.length, captured = state.camps.filter(c => c.captured).length;
       waveS.textContent = STR.stage(state.stage || 1);
-      waveN.textContent = STR.wave(state.waves.current, total);
-      const left = secondsToNextWave(state, balance);
-      if (left >= 0) {
-        const n = state.waves.current + 1;
-        const span = n === 1 ? waveStartSeconds(1, balance) : waveStartSeconds(n, balance) - waveStartSeconds(n - 1, balance);
-        waveBar.style.width = `${Math.max(0, 1 - left / span) * 100}%`;
-        waveT.textContent = n === 1 ? STR.firstWave(Math.ceil(left)) : STR.nextWave(Math.ceil(left));
-      } else {
-        waveBar.style.width = '100%';
-        waveT.textContent = STR.lastWave;
-      }
+      waveN.textContent = STR.camps(captured, total);
+      const hpLeft = state.camps.reduce((a, c) => a + Math.max(0, c.hp), 0), hpAll = state.camps.reduce((a, c) => a + c.maxHp, 0) || 1;
+      waveBar.style.width = `${(1 - hpLeft / hpAll) * 100}%`;
+      const before = balance.camps.startDelaySeconds - stageSeconds(state, balance);
+      waveT.textContent = before > 0 ? STR.firstWave(Math.ceil(before)) : STR.enemiesLeft(state.enemies.length);
       castleFill.style.width = `${state.castle.hp / state.castle.maxHp * 100}%`;
 
       for (const e of events) {
-        if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target !== 'enemy' ? 'to-ally' : e.by === 'commander' ? 'to-enemy big' : 'to-enemy');
-        else if (e.type === 'waveStart') { banner.textContent = STR.waveStart(e.wave); banner.classList.remove('hidden'); bannerT = 2; }
+        if (e.type === 'hit') spawnDmg(e.x, e.z, String(e.dmg), e.target !== 'enemy' && e.target !== 'camp' ? 'to-ally' : e.by === 'commander' ? 'to-enemy big' : 'to-enemy');
+        else if (e.type === 'campCaptured') { banner.textContent = STR.campCaptured(e.left); banner.classList.remove('hidden'); bannerT = 2.5; }
         else if (e.type === 'stageStart') { banner.textContent = STR.stageStart(e.stage); banner.classList.remove('hidden'); bannerT = 2.5; }
       }
       if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) banner.classList.add('hidden'); }
@@ -181,8 +176,8 @@ export function createHud(root, balance, { showFps, onPause, onRestart, onNewGam
         result.querySelector('.r-again').classList.toggle('ghost', win);
         result.querySelector('.r-again').textContent = win ? STR.newGame : STR.restart;
         // 버틴 웨이브: 이기면 전부, 지면 무너지기 전까지 끝까지 막아낸 웨이브(= 진행 중이던 웨이브 - 1)
-        const held = win ? balance.waves.total : Math.max(0, state.waves.current - 1);
-        result.querySelector('.r-wave').textContent = STR.survived(held, balance.waves.total);
+        const sec = Math.floor(stageSeconds(state, balance));
+        result.querySelector('.r-wave').textContent = win ? STR.capturedAll(state.camps.length) : STR.survivedTime(Math.floor(sec / 60), sec % 60);
         result.querySelector('.r-kills').textContent = STR.kills(state.kills);
         result.classList.remove('hidden');
         pauseBtn.classList.add('hidden');

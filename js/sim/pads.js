@@ -20,7 +20,6 @@ export function refreshPads(state, balance) {
     const reqOk = def.requires.every(r => state.unlocked[r]);
     let open = reqOk && !pad.done;
     if (def.archersPerUse && state.archers.length >= balance.archers.maxFollowers) open = false;
-    if (def.minWave && (state.stage || 1) < 2 && state.waves.current < def.minWave) open = false; // 스테이지 2부터는 바로
     if (def.upgradeTowers) {
       const towers = state.buildings.filter(b => b.kind === 'tower');
       if (towers.length < (def.minTowers || 1) || !towers.some(b => !b.upgraded)) open = false;
@@ -62,7 +61,9 @@ function unlockPad(state, pad, balance) {
   const def = defOf(balance, pad.id);
   state.events.push({ type: 'unlock', padId: pad.id });
   if (def.builds === 'walls' || def.builds === 'stoneWalls') {
-    buildWalls(state, balance, def.builds === 'walls' ? 1 : 2);
+    // 성벽 재건이면 지금 단계 그대로, 처음이면 목책(1), 돌벽 패드면 2
+    const level = def.builds === 'stoneWalls' ? 2 : pad.rebuild && state.wallLevel > 0 ? state.wallLevel : 1;
+    buildWalls(state, balance, level);
     state.unlocked[def.builds] = true;
     resolveAllies(state, balance);
   } else if (def.builds) {
@@ -75,6 +76,7 @@ function unlockPad(state, pad, balance) {
     const t = state.buildings.find(b => b.kind === 'tower' && !b.upgraded);
     if (t) { t.upgraded = true; state.events.push({ type: 'towerUpgrade', id: t.id, x: t.x, z: t.z }); }
   }
+  if (pad.rebuild) { pad.rebuild = false; pad.cost = def.cost; } // 재건 끝 → 원래 비용으로 (다시 부서지면 또 절반)
   if (def.repeat) {
     pad.uses += 1;
     pad.cost = def.cost + def.costStep * pad.uses;

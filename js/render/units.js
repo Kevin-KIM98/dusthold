@@ -34,9 +34,10 @@ function makeRig(scene, parts, max, name, rigScale = 1) {
 }
 
 const g = {
-  cyl: (rt, rb, h, y, seg = 8) => new THREE.CylinderGeometry(rt, rb, h, seg).translate(0, y, 0),
-  sph: (r, y, z = 0) => new THREE.SphereGeometry(r, 8, 6).translate(0, y, z),
-  cone: (r, h, y, seg = 8) => new THREE.ConeGeometry(r, h, seg).translate(0, y, 0),
+  // 적이 180명까지 나오므로 유닛 도형은 면 수를 아낀다 (작게 보여서 차이 없음)
+  cyl: (rt, rb, h, y, seg = 6) => new THREE.CylinderGeometry(rt, rb, h, seg, 1, true).translate(0, y, 0),
+  sph: (r, y, z = 0) => new THREE.IcosahedronGeometry(r, 1).translate(0, y, z),
+  cone: (r, h, y, seg = 6) => new THREE.ConeGeometry(r, h, seg, 1, true).translate(0, y, 0),
   box: (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z),
   rock: (r, x, y, z, sy = 1) => new THREE.DodecahedronGeometry(r, 0).scale(1, sy, 1).translate(x, y, z),
 };
@@ -90,8 +91,8 @@ function giantParts() {
 const UNIT_SCALE = 1.25;
 
 // 머리 위 체력 바 높이(m, 키운 뒤 기준)
-const BAR_Y = { wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
-const BAR_W = { wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
+const BAR_Y = { camp: 3.6, building: 3.2, tower: 7.0, wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
+const BAR_W = { camp: 3.2, building: 2.0, wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
 
 export function createUnitView(scene, balance, art = { models: {} }) {
   const r = balance.render;
@@ -109,7 +110,7 @@ export function createUnitView(scene, balance, art = { models: {} }) {
   };
 
   // 체력 바: 배경 + 채움 (화면을 향하는 평면)
-  const maxBars = r.maxEnemies + r.maxArchers + 4;
+  const maxBars = r.maxEnemies + r.maxArchers + 60; // + 성벽·건물·적 기지
   const barGeo = new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0); // 왼쪽 끝 기준
   const mk = (color) => {
     const m = new THREE.InstancedMesh(barGeo, new THREE.MeshBasicMaterial({ color, depthWrite: false, depthTest: false, toneMapped: false }), maxBars);
@@ -177,6 +178,8 @@ export function createUnitView(scene, balance, art = { models: {} }) {
       const c = state.commander;
       if (c.alive && c.hp < balance.commander.hp) bar(commanderPos.x, BAR_Y.commander, commanderPos.z, BAR_W.commander, c.hp / balance.commander.hp, GREEN);
       for (const w of state.walls) if (w.hp < w.maxHp) bar(w.x, BAR_Y.wall, w.z, Math.min(BAR_W.wall, 2 * Math.max(w.halfWidth, w.halfDepth)), w.hp / w.maxHp, GOLD);
+      for (const cp of state.camps) if (!cp.captured && cp.hp < cp.maxHp) bar(cp.x, BAR_Y.camp, cp.z, BAR_W.camp, cp.hp / cp.maxHp, RED);
+      for (const b of state.buildings) if (b.maxHp > 0 && b.hp < b.maxHp) bar(b.x, b.kind === 'tower' ? BAR_Y.tower : BAR_Y.building, b.z, BAR_W.building, b.hp / b.maxHp, GOLD);
       const k = state.castle;
       if (k.hp < k.maxHp) bar(k.x, BAR_Y.castle, k.z, BAR_W.castle, k.hp / k.maxHp, GOLD);
       barBg.count = barFill.count = n;

@@ -29,9 +29,9 @@ export function createFx(scene, balance) {
 
   // 칼바람: 성주 앞에 반달 모양이 휙 퍼지며 사라짐 (투명도 때문에 몇 개만 돌려 씀)
   const slashes = [];
-  const slashGeo = new THREE.RingGeometry(0.7, 1.6, 18, 1, Math.PI / 2 - 1.1, 2.2).rotateX(-Math.PI / 2);
+  const slashGeo = new THREE.RingGeometry(1.0, 2.6, 22, 1, Math.PI / 2 - 1.3, 2.6).rotateX(-Math.PI / 2); // 범위 베기에 맞게 넓게
   for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(slashGeo, new THREE.MeshBasicMaterial({ color: 0xe6fbff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(slashGeo, new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     m.visible = false; m.renderOrder = 6; m.name = 'slashFx';
     scene.add(m);
     slashes.push({ m, t: 1 });
@@ -57,6 +57,13 @@ export function createFx(scene, balance) {
       s.m.position.set(x, 1.15, z);
       s.m.rotation.y = yaw + Math.PI; // 링의 +z 쪽이 앞
       s.m.visible = true;
+    },
+    /** 은화 폭발: 쓰러진 자리에서 은화 몇 개가 튀어 올라 주변에 떨어지는 연출 (실제 은화는 sim이 놓음) */
+    burst(x, z, n) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 1.6;
+        this.fly(new THREE.Vector3(x, 0.6, z), new THREE.Vector3(x + Math.cos(a) * r, 0.25, z + Math.sin(a) * r), i * 0.01);
+      }
     },
     throwAxe(x, z, tx, tz) {
       if (flying.length >= axeMax) flying.shift();

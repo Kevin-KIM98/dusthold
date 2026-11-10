@@ -3,7 +3,7 @@ import { createRng, range } from './rng.js';
 import { distToPolyline } from './collision.js';
 import { spawnStartCoins } from './coins.js';
 import { createPads, refreshPads } from './pads.js';
-import { createWaves } from './waves.js';
+import { createCamps } from './camps.js';
 
 export function createState(balance, seed) {
   const map = balance.map;
@@ -36,16 +36,19 @@ export function createState(balance, seed) {
     unlocked: {},
     archers: [],
     enemies: [],
-    waves: createWaves(),
+    spawn: { startTick: 0, paused: false },
+    camps: [],
     kills: 0,
     walls: [],
     wallLevel: 0,
     result: null,
     stage: 1,
   };
+  buildCliffs(state, balance);
   scatter(state, map, 'tree', map.trees);
   scatter(state, map, 'rock', map.rocks);
   spawnStartCoins(state, balance);
+  state.camps = createCamps(state, balance);
   refreshPads(state, balance);
   return state;
 }
@@ -79,5 +82,32 @@ function scatter(state, map, kind, cfg) {
     const rot = range(state.rng, 0, Math.PI * 2);
     state.obstacles.push({ kind, x, z, r, scale, rot });
     placed++;
+  }
+}
+
+/**
+ * 절벽 (2026-11-10): 성벽 밖 길 양쪽을 바위 절벽(원 충돌체)으로 막아 좁은 길을 만든다.
+ * 꺾이는 곳 안쪽이 길을 침범하면 건너뛴다.
+ */
+function buildCliffs(state, balance) {
+  const cfg = balance.map.cliffs, map = balance.map;
+  const W = balance.walls.half + cfg.stopOutsideWall;
+  for (const p of state.paths) {
+    const off = p.width / 2 + cfg.offset;
+    for (let i = 0; i + 1 < p.points.length; i++) {
+      const [ax, az] = p.points[i], [bx, bz] = p.points[i + 1];
+      const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len;
+      for (let t = 0; t <= len; t += cfg.spacing) {
+        const cx = ax + dx * t, cz = az + dz * t;
+        if (Math.max(Math.abs(cx - state.castle.x), Math.abs(cz - state.castle.z)) < W) continue;
+        for (const side of [1, -1]) {
+          const x = cx - dz * off * side, z = cz + dx * off * side;
+          if (Math.abs(x) > map.halfSize - 0.3 || Math.abs(z) > map.halfSize - 0.3) continue;
+          if (state.paths.some(q => distToPolyline(x, z, q.points) < q.width / 2 + cfg.radius * 0.95)) continue;
+          if (state.obstacles.some(o => Math.hypot(o.x - x, o.z - z) < cfg.spacing * 0.6)) continue;
+          state.obstacles.push({ kind: 'cliff', x, z, r: cfg.radius, scale: 1, rot: (x * 7.1 + z * 3.3) % (Math.PI * 2) });
+        }
+      }
+    }
   }
 }

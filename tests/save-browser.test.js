@@ -13,7 +13,7 @@ test('진행 → 다시 접속하면 "이어서 하기"로 그대로 이어지�
   try {
     const { page } = g;
     // 막사 짓고 은화 들고 있는 상태 만들기 (실제 규칙으로)
-    await page.evaluate(() => { __game.state.waves.paused = false; __game.state.commander.coins = 30; });
+    await page.evaluate(() => { __game.state.spawn.paused = false; __game.state.commander.coins = 30; });
     const bp = await page.evaluate(() => __game.state.pads.find(p => p.id === 'barracks'));
     await page.evaluate(([x, z]) => { const c = __game.state.commander; c.x = c.prevX = x; c.z = c.prevZ = z; }, [bp.x, bp.z]);
     await page.waitForFunction(() => __game.state.unlocked.barracks, null, { timeout: 10000 });
@@ -25,7 +25,7 @@ test('진행 → 다시 접속하면 "이어서 하기"로 그대로 이어지�
     await page.reload();
     await page.waitForFunction(() => window.__game && __game.ready, null, { timeout: 20000 });
     assert.equal(await page.$eval('.resume', el => getComputedStyle(el).display !== 'none'), true, '이어하기 창');
-    assert.match(await page.$eval('.resume .r-info', el => el.textContent), /스테이지 \d+ · 웨이브 \d+ · 은화 \d+개/);
+    assert.match(await page.$eval('.resume .r-info', el => el.textContent), /스테이지 \d+ · 적 기지 \d+\/\d+ 점령 · 은화 \d+개/);
     assert.equal(await page.evaluate(() => __game.isPaused()), true, '고르기 전엔 멈춤');
     const box = await page.$eval('.resume .r-go', el => { const r = el.getBoundingClientRect(); return r.height; });
     assert.ok(box >= 44, '버튼 44px 이상');

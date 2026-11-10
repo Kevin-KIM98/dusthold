@@ -13,7 +13,7 @@ const STILL = { x: 0, z: 0 };
 const run = (s, input, ticks) => { for (let i = 0; i < ticks; i++) step(s, input, B); };
 const place = (s, x, z) => { const c = s.commander; c.x = c.prevX = x; c.z = c.prevZ = z; };
 const pad = (s, id) => s.pads.find(p => p.id === id);
-const fresh = () => { const s = createState(B, 1); s.coins = []; s.waves.paused = true; return s; };
+const fresh = () => { const s = createState(B, 1); s.coins = []; s.spawn.paused = true; return s; };
 
 /** 간단한 자동 조종: 목표 지점까지 직선으로 걷기 */
 function goTo(s, x, z, maxTicks = 600) {

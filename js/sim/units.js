@@ -2,7 +2,7 @@
 import { resolveCollisions } from './commander.js';
 import { pushOutOfBox } from './collision.js';
 import { boxDist } from './walls.js';
-import { stageScale } from './stages.js';
+import { stageScale } from './scale.js';
 
 // ── 궁수 ──────────────────────────────────────────────
 export function spawnArchers(state, n, x, z, balance) {
@@ -58,10 +58,11 @@ export function updateArchers(state, balance) {
 }
 
 // ── 적 ────────────────────────────────────────────────
-export function spawnEnemy(state, type, pathId, balance, wave = 0) {
+/** (x, z)를 주면 그 자리(적 기지 앞)에서, 없으면 길 시작점에서 */
+export function spawnEnemy(state, type, pathId, balance, wave = 0, ox = null, oz = null) {
   const t = balance.enemies.types[type];
   const path = state.paths.find(p => p.id === pathId);
-  const [x, z] = path.points[0];
+  const [x, z] = ox === null ? path.points[0] : [ox, oz];
   const sc = stageScale(state.stage, balance); // 스테이지가 오를수록 강해짐
   const hp = Math.round(t.hp * sc.hp);
   const e = {
@@ -96,33 +97,31 @@ function segmentHitsBox(ax, az, bx, bz, box, r) {
 }
 
 /**
- * 이 적이 지금 공격하러 갈 대상 (기획서 ③ "가는 길 2m 안 아군·성벽")
- * - 2m 안 가장 가까운 아군(성주·궁수)이 있으면 그쪽, 없으면 길을 따라 감
- * - 가려는 길을 2m 안 성벽이 막고 있으면 그 성벽 (부서진 틈이 있으면 그리로 지나감)
- * - 반환: { kind, obj, d(가장자리까지 거리), px, pz(다가갈 점), r } 또는 null
+ * 이 적이 지금 공격하러 갈 대상 (기획서 ③ 2026-11-10: 적은 건물만 공격, 아군은 무시)
+ * - 가려는 길을 2m 안 성벽이 막으면 그 성벽 (부서진 틈이 있으면 그리로 지나감)
+ * - 아니면 2m 안 건물(막사·세금 탁자·망루) 중 가장 가까운 것
+ * - 반환: { kind: 'wall'|'building', obj, d(가장자리까지 거리), px, pz(다가갈 점) } 또는 null
  */
 export function enemyTarget(state, e, balance) {
   const aggro = balance.enemies.aggroRange;
   const er = balance.enemies.types[e.type].radius;
-  let ally = null;
-  const consider = (cand) => { if (cand.d <= aggro && (!ally || cand.d < ally.d)) ally = cand; };
-  const c = state.commander;
-  if (c.alive) {
-    const r = balance.commander.radius;
-    consider({ kind: 'commander', obj: c, d: Math.hypot(c.x - e.x, c.z - e.z) - r, px: c.x, pz: c.z, r });
-  }
-  const ar = balance.archers.radius;
-  for (const a of state.archers) consider({ kind: 'archer', obj: a, d: Math.hypot(a.x - e.x, a.z - e.z) - ar, px: a.x, pz: a.z, r: ar });
-
-  const [gx, gz] = ally ? [ally.px, ally.pz] : pathGoal(state, e);
+  const [gx, gz] = pathGoal(state, e);
   let wall = null;
   for (const w of state.walls) {
+    if (Math.abs(e.x - w.x) > w.halfWidth + aggro || Math.abs(e.z - w.z) > w.halfDepth + aggro) continue; // 멀면 바로 건너뜀 (성능)
     const b = boxDist(w, e.x, e.z);
     if (b.d > aggro || (wall && b.d >= wall.d)) continue;
     if (!segmentHitsBox(e.x, e.z, gx, gz, w, er * 0.9)) continue;
-    wall = { kind: 'wall', obj: w, d: b.d, px: b.px, pz: b.pz, r: 0 };
+    wall = { kind: 'wall', obj: w, d: b.d, px: b.px, pz: b.pz };
   }
-  return wall || ally;
+  if (wall) return wall;
+  let bld = null;
+  for (const o of state.buildings) {
+    if (Math.abs(e.x - o.x) > o.halfWidth + aggro || Math.abs(e.z - o.z) > o.halfDepth + aggro) continue;
+    const b = boxDist(o, e.x, e.z);
+    if (b.d <= aggro && (!bld || b.d < bld.d)) bld = { kind: 'building', obj: o, d: b.d, px: b.px, pz: b.pz };
+  }
+  return bld;
 }
 
 /** 대상이 손 닿는 거리인지 */
@@ -176,9 +175,10 @@ export function updateEnemies(state, balance) {
   separateEnemies(state, balance);
   for (const e of state.enemies) {
     const r = ecfg.types[e.type].radius;
-    pushOutOfBox(e, r, state.castle);
-    for (const b of state.buildings) pushOutOfBox(e, r, b);
-    for (const w of state.walls) pushOutOfBox(e, r, w); // 적은 성문도 못 지나감
+    const near = o => Math.abs(e.x - o.x) <= o.halfWidth + r && Math.abs(e.z - o.z) <= o.halfDepth + r;
+    if (near(state.castle)) pushOutOfBox(e, r, state.castle);
+    for (const b of state.buildings) if (near(b)) pushOutOfBox(e, r, b);
+    for (const w of state.walls) if (near(w)) pushOutOfBox(e, r, w); // 적은 성문도 못 지나감
   }
 }
 

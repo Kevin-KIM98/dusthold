@@ -12,7 +12,7 @@ const STACK_BASE = 1.3;     // 탑 바닥 높이 (m)
 const TABLE_TOP = 0.85;
 
 export function makeCoinGeometry(thickness) {
-  return new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, thickness, 12);
+  return new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, thickness, 8); // 8각이면 충분 (작게 보임)
 }
 
 export function createCoinView(scene, balance) {
@@ -23,7 +23,7 @@ export function createCoinView(scene, balance) {
   const stack = new THREE.InstancedMesh(geo, mat, balance.coins.carryMax);
   const tableMax = balance.buildings.taxTable.max * 2; // 탁자 2개까지 여유
   const table = new THREE.InstancedMesh(geo, mat, tableMax);
-  for (const m of [ground, stack, table]) { m.count = 0; m.castShadow = true; m.frustumCulled = false; scene.add(m); }
+  for (const m of [ground, stack, table]) { m.count = 0; m.castShadow = m === stack; m.frustumCulled = false; scene.add(m); } // 바닥 은화는 그림자 생략 (수백 개)
   _qx.setFromAxisAngle(_ax, Math.PI / 2);
 
   return {

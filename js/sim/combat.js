@@ -1,17 +1,35 @@
-// 전투: 자동 공격 · 피해 · 죽음(은화 떨어뜨림) · 성주 쓰러짐/부활
+// 전투 (기획서 ③ 2026-11-10 개편)
+// - 성주: 빛나는 칼로 범위 베기(가까우면) / 손도끼 던지기(멀면). 적이 없으면 적 기지를 공격
+// - 궁수·망루: 가장 가까운 적, 없으면 사거리 안 적 기지
+// - 적: 건물만 공격 (성벽·망루·막사·세금 탁자·성채). 아군은 공격하지 않음
 import { range } from './rng.js';
 import { spawnCoin } from './coins.js';
 import { enemyTarget, inReach, distToCastle } from './units.js';
+import { boxDist } from './walls.js';
+import { captureCamp } from './camps.js';
+import { destroyBuilding } from './buildings.js';
 
 const ticks = (s, balance) => Math.round(s / balance.sim.tickSeconds);
+const enemyR = (e, balance) => balance.enemies.types[e.type].radius;
 
 /** (x,z)에서 사거리 안 가장 가까운 적 (거리 = 중심 간 거리 − 적 반지름) */
 function nearestEnemy(state, x, z, rangeM, balance) {
   let best = null, bestD = Infinity;
   for (const e of state.enemies) {
     if (e.hp <= 0) continue;
-    const d = Math.hypot(e.x - x, e.z - z) - balance.enemies.types[e.type].radius;
+    const d = Math.hypot(e.x - x, e.z - z) - enemyR(e, balance);
     if (d <= rangeM && d < bestD) { best = e; bestD = d; }
+  }
+  return best;
+}
+
+/** 사거리 안(가장자리까지) 아직 점령 안 된 적 기지 */
+function campInRange(state, x, z, rangeM) {
+  let best = null, bestD = Infinity;
+  for (const c of state.camps) {
+    if (c.captured) continue;
+    const d = boxDist(c, x, z).d;
+    if (d <= rangeM && d < bestD) { best = c; bestD = d; }
   }
   return best;
 }
@@ -21,26 +39,61 @@ function damageEnemy(state, e, dmg, balance, by = '') {
   state.events.push({ type: 'hit', target: 'enemy', id: e.id, x: e.x, z: e.z, dmg, by });
 }
 
+function damageCamp(state, camp, dmg, x, z, by = '') {
+  camp.hp -= dmg;
+  const p = boxDist(camp, x, z);
+  state.events.push({ type: 'hit', target: 'camp', id: camp.id, x: p.px, z: p.pz, dmg, by });
+}
+
+/** 공격 대상 하나: 적 우선, 없으면 적 기지. { kind, obj, x, z } */
+function pickTarget(state, x, z, rangeM, balance) {
+  const e = nearestEnemy(state, x, z, rangeM, balance);
+  if (e) return { kind: 'enemy', obj: e, x: e.x, z: e.z };
+  const c = campInRange(state, x, z, rangeM);
+  if (c) { const p = boxDist(c, x, z); return { kind: 'camp', obj: c, x: p.px, z: p.pz }; }
+  return null;
+}
+
+function strike(state, t, dmg, fromX, fromZ, balance, by) {
+  if (t.kind === 'enemy') damageEnemy(state, t.obj, dmg, balance, by);
+  else damageCamp(state, t.obj, dmg, fromX, fromZ, by);
+}
+
 export function updateCombat(state, balance) {
   const c = state.commander;
   const ccfg = balance.commander, acfg = balance.archers;
-  updateRespawn(state, balance); // 쓰러진 틱은 세지 않도록 공격보다 먼저
+  updateRespawn(state, balance);
 
-  // 성주 공격: 칼이 닿으면 칼(더 셈), 아니면 사거리 안 적에게 손도끼 던지기 (대기 시간은 함께 씀)
+  // 성주: 칼 사거리 안 적이 있으면 범위 베기(최대 cleaveMax명), 아니면 손도끼, 적이 없으면 기지
   if (c.alive) {
     if (c.cooldown > 0) c.cooldown -= 1;
     if (c.cooldown <= 0) {
-      const e = nearestEnemy(state, c.x, c.z, ccfg.range, balance);
-      if (e) {
-        damageEnemy(state, e, ccfg.attack, balance, 'commander');
-        state.events.push({ type: 'slash', x: c.x, z: c.z, tx: e.x, tz: e.z });
+      const near = [];
+      for (const e of state.enemies) {
+        if (e.hp <= 0) continue;
+        const d = Math.hypot(e.x - c.x, e.z - c.z) - enemyR(e, balance);
+        if (d <= ccfg.range) near.push([d, e]);
+      }
+      if (near.length) {
+        near.sort((a, b) => a[0] - b[0] || a[1].id - b[1].id);
+        const hits = near.slice(0, ccfg.cleaveMax).map(p => p[1]);
+        for (const e of hits) damageEnemy(state, e, ccfg.attack, balance, 'commander');
+        state.events.push({ type: 'slash', x: c.x, z: c.z, tx: hits[0].x, tz: hits[0].z, n: hits.length });
         c.cooldown = ticks(ccfg.attackInterval, balance);
       } else {
-        const far = nearestEnemy(state, c.x, c.z, ccfg.rangedRange, balance);
-        if (far) {
-          damageEnemy(state, far, ccfg.rangedAttack, balance, 'commander');
-          state.events.push({ type: 'throw', x: c.x, z: c.z, tx: far.x, tz: far.z });
-          c.cooldown = ticks(ccfg.rangedInterval, balance);
+        const camp = campInRange(state, c.x, c.z, ccfg.range);
+        if (camp) {
+          damageCamp(state, camp, ccfg.attack, c.x, c.z, 'commander');
+          const p = boxDist(camp, c.x, c.z);
+          state.events.push({ type: 'slash', x: c.x, z: c.z, tx: p.px, tz: p.pz, n: 1 });
+          c.cooldown = ticks(ccfg.attackInterval, balance);
+        } else {
+          const t = pickTarget(state, c.x, c.z, ccfg.rangedRange, balance);
+          if (t) {
+            strike(state, t, ccfg.rangedAttack, c.x, c.z, balance, 'commander');
+            state.events.push({ type: 'throw', x: c.x, z: c.z, tx: t.x, tz: t.z });
+            c.cooldown = ticks(ccfg.rangedInterval, balance);
+          }
         }
       }
     }
@@ -50,11 +103,11 @@ export function updateCombat(state, balance) {
   for (const a of state.archers) {
     if (a.cooldown > 0) a.cooldown -= 1;
     if (a.cooldown > 0) continue;
-    const e = nearestEnemy(state, a.x, a.z, acfg.range, balance);
-    if (!e) continue;
-    a.angle = Math.atan2(e.x - a.x, e.z - a.z);
-    damageEnemy(state, e, acfg.attack, balance);
-    state.events.push({ type: 'shot', x: a.x, z: a.z, tx: e.x, tz: e.z });
+    const t = pickTarget(state, a.x, a.z, acfg.range, balance);
+    if (!t) continue;
+    a.angle = Math.atan2(t.x - a.x, t.z - a.z);
+    strike(state, t, acfg.attack, a.x, a.z, balance);
+    state.events.push({ type: 'shot', x: a.x, z: a.z, tx: t.x, tz: t.z });
     a.cooldown = ticks(acfg.attackInterval, balance);
   }
 
@@ -66,17 +119,17 @@ export function updateCombat(state, balance) {
     b.towerArchers.forEach((ta, i) => {
       if (ta.cooldown > 0) ta.cooldown -= 1;
       if (ta.cooldown > 0) return;
-      const e = nearestEnemy(state, b.x, b.z, tcfg.range, balance);
-      if (!e) return;
-      ta.angle = Math.atan2(e.x - b.x, e.z - b.z);
-      damageEnemy(state, e, dmg, balance);
+      const t = pickTarget(state, b.x, b.z, tcfg.range, balance);
+      if (!t) return;
+      ta.angle = Math.atan2(t.x - b.x, t.z - b.z);
+      strike(state, t, dmg, b.x, b.z, balance);
       const o = towerArcherOffset(i, b);
-      state.events.push({ type: 'shot', x: b.x + o.x, z: b.z + o.z, tx: e.x, tz: e.z, from: 'tower' });
+      state.events.push({ type: 'shot', x: b.x + o.x, z: b.z + o.z, tx: t.x, tz: t.z, from: 'tower' });
       ta.cooldown = ticks(tcfg.attackInterval, balance);
     });
   }
 
-  // 적 공격
+  // 적 공격: 건물만
   for (const e of state.enemies) {
     if (e.hp <= 0) continue;
     const t = balance.enemies.types[e.type];
@@ -85,34 +138,35 @@ export function updateCombat(state, balance) {
     const target = enemyTarget(state, e, balance);
     let hit = null;
     if (target && inReach(e, target, balance)) hit = target;
-    else if (!target && e.wp >= pathLen(state, e) && distToCastle(state, e) <= t.radius + t.reach + 1e-6) hit = { kind: 'castle', obj: state.castle };
+    else if (!target && e.wp >= pathLen(state, e) && distToCastle(state, e) <= t.radius + t.reach + 1e-6) {
+      const p = boxDist(state.castle, e.x, e.z);
+      hit = { kind: 'castle', obj: state.castle, px: p.px, pz: p.pz };
+    }
     if (!hit) continue;
     e.attacking = true;
     if (e.cooldown > 0) continue;
     e.cooldown = ticks(t.attackInterval, balance);
     const dmg = Math.round(t.attack * (e.atk || 1));
-    if (hit.kind === 'castle') {
-      state.castle.hp = Math.max(0, state.castle.hp - dmg);
-      state.events.push({ type: 'hit', target: 'castle', x: e.x, z: e.z, dmg: dmg });
-      continue;
-    }
-    if (hit.kind === 'wall') {
-      hit.obj.hp -= dmg;
-      state.events.push({ type: 'hit', target: 'wall', id: hit.obj.id, x: hit.px, z: hit.pz, dmg: dmg });
-    } else if (!t.splash) {
-      if (hit.kind === 'commander') hurtCommander(state, dmg, balance);
-      else hurtArcher(state, hit.obj, dmg);
-    }
+    hurtStructure(state, hit.kind, hit.obj, dmg, hit.px, hit.pz);
     if (t.splash) {
-      // 거인: 내려친 자리 주변 splash m 안 아군 모두
-      const px = hit.px, pz = hit.pz;
-      if (c.alive && Math.hypot(c.x - px, c.z - pz) <= t.splash) hurtCommander(state, dmg, balance);
-      for (const a of state.archers) if (Math.hypot(a.x - px, a.z - pz) <= t.splash) hurtArcher(state, a, dmg);
-      state.events.push({ type: 'smash', x: px, z: pz });
+      // 거인: 내려친 자리 주변 splash m 안 다른 건물·성벽도
+      for (const w of state.walls) if (w !== hit.obj && boxDist(w, hit.px, hit.pz).d <= t.splash) hurtStructure(state, 'wall', w, dmg, hit.px, hit.pz);
+      for (const b of state.buildings) if (b !== hit.obj && boxDist(b, hit.px, hit.pz).d <= t.splash) hurtStructure(state, 'building', b, dmg, hit.px, hit.pz);
+      state.events.push({ type: 'smash', x: hit.px, z: hit.pz });
     }
   }
 
   cleanupDead(state, balance);
+}
+
+function hurtStructure(state, kind, obj, dmg, x, z) {
+  if (kind === 'castle') {
+    state.castle.hp = Math.max(0, state.castle.hp - dmg);
+    state.events.push({ type: 'hit', target: 'castle', x, z, dmg });
+  } else {
+    obj.hp -= dmg;
+    state.events.push({ type: 'hit', target: kind, id: obj.id, x, z, dmg });
+  }
 }
 
 /** 망루 위 궁수 i번 자리 (망루 중심 기준) */
@@ -124,27 +178,7 @@ export function towerArcherOffset(i, b) {
 
 function pathLen(state, e) { return state.paths.find(p => p.id === e.pathId).points.length; }
 
-function hurtArcher(state, a, dmg) {
-  a.hp -= dmg;
-  state.events.push({ type: 'hit', target: 'archer', id: a.id, x: a.x, z: a.z, dmg });
-}
-
-function hurtCommander(state, dmg, balance) {
-  const c = state.commander;
-  c.hp -= dmg;
-  state.events.push({ type: 'hit', target: 'commander', x: c.x, z: c.z, dmg });
-  if (c.hp > 0) return;
-  // 쓰러짐: 들고 있던 은화 절반을 떨어뜨리고 respawnSeconds 뒤 성채 앞에서 부활
-  c.hp = 0;
-  c.alive = false;
-  c.moving = false;
-  c.respawn = ticks(balance.commander.respawnSeconds, balance);
-  const drop = Math.floor(c.coins * balance.commander.dropFraction);
-  c.coins -= drop;
-  scatterCoins(state, c.x, c.z, drop, balance.commander.dropSpread, balance);
-  state.events.push({ type: 'commanderDown', x: c.x, z: c.z, dropped: drop });
-}
-
+// 적이 아군을 공격하지 않으므로 성주는 쓰러지지 않는다. (예전 저장에서 쓰러진 상태로 불러온 경우만 대비)
 function updateRespawn(state, balance) {
   const c = state.commander;
   if (c.alive) return;
@@ -158,7 +192,7 @@ function updateRespawn(state, balance) {
   state.events.push({ type: 'commanderRespawn', x: s.x, z: s.z });
 }
 
-function scatterCoins(state, x, z, n, spread, balance) {
+export function scatterCoins(state, x, z, n, spread, balance) {
   for (let i = 0; i < n; i++) {
     const a = range(state.rng, 0, Math.PI * 2);
     const r = spread * Math.sqrt(range(state.rng, 0, 1));
@@ -166,24 +200,33 @@ function scatterCoins(state, x, z, n, spread, balance) {
   }
 }
 
+/** 쓰러진 적 → 은화 */
+export function dropEnemyCoins(state, e, balance) {
+  scatterCoins(state, e.x, e.z, balance.enemies.types[e.type].coins, balance.enemies.dropSpread, balance);
+  state.kills += 1;
+  state.events.push({ type: 'enemyDown', id: e.id, enemy: e.type, x: e.x, z: e.z });
+}
+
 function cleanupDead(state, balance) {
   if (state.enemies.some(e => e.hp <= 0)) {
     const alive = [];
     for (const e of state.enemies) {
-      if (e.hp > 0) { alive.push(e); continue; }
-      const t = balance.enemies.types[e.type];
-      scatterCoins(state, e.x, e.z, t.coins, balance.enemies.dropSpread, balance);
-      state.kills += 1;
-      state.events.push({ type: 'enemyDown', id: e.id, enemy: e.type, x: e.x, z: e.z });
+      if (e.hp > 0) alive.push(e);
+      else dropEnemyCoins(state, e, balance);
     }
     state.enemies = alive;
   }
+  for (const camp of state.camps) if (!camp.captured && camp.hp <= 0) captureCamp(state, camp, balance);
   if (state.walls.some(w => w.hp <= 0)) {
     for (const w of state.walls) if (w.hp <= 0) state.events.push({ type: 'wallDown', id: w.id, x: w.x, z: w.z, gate: w.gate });
     state.walls = state.walls.filter(w => w.hp > 0);
+    // 성벽 패드가 다시 열려 절반 비용으로 모든 구간 재건
+    const wp = state.pads.find(p => p.id === 'walls');
+    const def = balance.pads.list.find(d => d.id === 'walls');
+    if (wp && wp.done && state.wallLevel > 0) {
+      wp.done = false; wp.rebuild = true; wp.paid = 0;
+      wp.cost = Math.ceil(def.cost * balance.buildings.rebuildCostFactor);
+    }
   }
-  if (state.archers.some(a => a.hp <= 0)) {
-    for (const a of state.archers) if (a.hp <= 0) state.events.push({ type: 'archerDown', id: a.id, x: a.x, z: a.z });
-    state.archers = state.archers.filter(a => a.hp > 0);
-  }
+  for (const b of [...state.buildings]) if (b.hp !== undefined && b.maxHp > 0 && b.hp <= 0) destroyBuilding(state, b, balance);
 }

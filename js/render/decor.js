@@ -25,7 +25,7 @@ const _c = new THREE.Color(), _t = new THREE.Color();
 /** tex = 잔디 텍스처(있으면 얼룩은 밝기 변화로만 곱해짐), tileMeters = 텍스처 한 장이 덮는 크기 */
 export function buildGrassGround(scene, map, wallsHalf, tex = null, tileMeters = 7) {
   const size = map.halfSize * 2;
-  const seg = 72;
+  const seg = 48;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg).rotateX(-Math.PI / 2);
   const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {

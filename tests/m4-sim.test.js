@@ -7,7 +7,6 @@ import { step } from '../js/sim/rules.js';
 import { buildWalls, layoutWalls } from '../js/sim/walls.js';
 import { spawnEnemy, spawnArchers } from '../js/sim/units.js';
 import { addBuilding } from '../js/sim/buildings.js';
-import { waveStartSeconds } from '../js/sim/waves.js';
 import { distToPolyline } from '../js/sim/collision.js';
 
 const B = loadBalance();
@@ -16,7 +15,7 @@ const STILL = { x: 0, z: 0 };
 const run = (s, input, ticks) => { for (let i = 0; i < ticks; i++) step(s, input, B); };
 const place = (o, x, z) => { o.x = o.prevX = x; o.z = o.prevZ = z; };
 const pad = (s, id) => s.pads.find(p => p.id === id);
-const quiet = () => { const s = createState(B, 1); s.coins = []; s.waves.paused = true; return s; };
+const quiet = () => { const s = createState(B, 1); s.coins = []; s.spawn.paused = true; return s; };
 const W = B.walls.half;
 function goTo(s, x, z, maxTicks = 800) {
   for (let i = 0; i < maxTicks; i++) {
@@ -87,7 +86,7 @@ test('성문이 부서지면 적이 들어와 성채를 공격한다', () => {
   buildWalls(s, B, 1);
   place(s.commander, -8, -8);
   gateOf(s, 'south').hp = 1;
-  run(s, STILL, 60 * TPS);
+  run(s, STILL, 150 * TPS);
   assert.equal(gateOf(s, 'south'), undefined, '성문 부서짐');
   assert.ok(s.castle.hp < B.castle.hp);
 });
@@ -174,48 +173,15 @@ test('망루 강화: 망루 2개 이상이면 열리고, 쓸 때마다 망루 1�
   assert.ok(dmg.length > 0 && dmg.every(d => d === B.towers.attack * B.towers.upgradeMultiplier), `피해 ${dmg}`);
 });
 
-test('웨이브 5에 거인이 나와, 성주가 옆에 있어도 성벽부터 부순다', () => {
-  const s = createState(B, 1);
-  buildWalls(s, B, 1);
-  s.waves.current = 4;
-  s.tick = Math.round(waveStartSeconds(5, B) * TPS) - 1;
-  s.time = s.tick * B.sim.tickSeconds;
-  const gate = gateOf(s, 'south');
-  place(s.commander, gate.x + 0.6, W - 1.2); // 성문 바로 안쪽
-  s.commander.cooldown = 1e9;
-  let giant = null, firstHit = null;
-  for (let i = 0; i < 120 * TPS && !firstHit; i++) {
-    step(s, STILL, B);
-    giant = giant || s.enemies.find(e => e.type === 'giant');
-    if (giant) {
-      // 다른 적이 성문을 먼저 부수지 않도록 일반 병사는 치움
-      for (const e of s.enemies) if (e.type !== 'giant') e.hp = 0;
-      s.commander.hp = B.commander.hp; s.commander.alive = true;
-    }
-    if (giant && giant.cooldown > 0 && giant.attacking) firstHit = s.events.find(ev => ev.type === 'hit' && ev.target !== 'enemy');
-  }
-  assert.ok(giant, '웨이브 5에 거인 등장');
-  assert.equal(giant.wave, 5, '웨이브 5의 거인');
-  assert.ok(firstHit, '거인이 공격함');
-  assert.equal(firstHit.target, 'wall', `거인의 첫 공격 대상: ${firstHit.target}`);
-  // 목책 체력 ÷ 거인 공격력 만큼 내려치면 부서짐
-  const hitsNeeded = Math.ceil(B.walls.woodHp / B.enemies.types.giant.attack);
-  run(s, STILL, Math.ceil((hitsNeeded + 1) * B.enemies.types.giant.attackInterval * TPS));
-  assert.equal(gateOf(s, 'south'), undefined, '거인이 성문을 부숨');
-});
-
-test('돌벽: 웨이브 5부터 열리고, 부서진 구간까지 모두 1500으로 다시 세운다', () => {
+test('돌벽: 성벽을 세운 뒤 열리고, 부서진 구간까지 모두 1500으로 다시 세운다', () => {
   const s = quiet();
   s.unlocked.walls = true;
   const wp = pad(s, 'walls');
   wp.done = true;
   buildWalls(s, B, 1);
   const total = s.walls.length;
-  s.walls = s.walls.slice(2); // 두 구간 부서짐
+  s.walls = s.walls.slice(2);
   const sp = pad(s, 'stoneWalls');
-  run(s, STILL, 1);
-  assert.equal(sp.open, false, '웨이브 5 전에는 닫힘');
-  s.waves.current = 5;
   run(s, STILL, 1);
   assert.equal(sp.open, true);
   s.commander.coins = 100;
@@ -226,28 +192,26 @@ test('돌벽: 웨이브 5부터 열리고, 부서진 구간까지 모두 1500으
   for (const w of s.walls) { assert.equal(w.hp, B.walls.stoneHp); assert.equal(w.maxHp, B.walls.stoneHp); }
 });
 
-test('승리: 웨이브 10까지 다 나오고 적을 모두 처치하면 win, 그 뒤로는 멈춤', () => {
+test('거인은 성벽(성문)을 내려치고, 2m 안 다른 건물·성벽도 같이 다친다', () => {
   const s = quiet();
-  s.waves.paused = false;
-  s.waves.current = B.waves.total;
-  const e = spawnEnemy(s, 'raider', 'south', B); e.wp = 99;
-  place(e, 0, 25);
-  run(s, STILL, 1);
-  assert.equal(s.result, null, '적이 남아 있으면 아직');
-  e.hp = 0;
-  run(s, STILL, 1);
-  assert.equal(s.result, 'win');
-  const t = s.tick;
-  run(s, { x: 1, z: 0 }, 10);
-  assert.equal(s.tick, t, '끝난 판은 멈춤');
+  buildWalls(s, B, 1);
+  const gate = gateOf(s, 'south');
+  place(s.commander, -25, -25);
+  const g = spawnEnemy(s, 'giant', 'south', B);
+  place(g, gate.x, W + 2.2); g.wp = 3;
+  const hp0 = s.walls.map(w => w.hp);
+  run(s, STILL, 6 * TPS);
+  assert.ok(gate.hp < B.walls.woodHp, '성문 맞음');
+  const others = s.walls.filter((w, i) => w !== gate && w.hp < hp0[i]);
+  assert.ok(others.length >= 1, '옆 구간도 범위 피해');
 });
 
 test('패배: 성채 체력이 0이 되면 lose', () => {
   const s = createState(B, 1);
   place(s.commander, -25, -25);
   let lostAt = -1;
-  for (let i = 0; i < 300 * TPS && !s.result; i++) { step(s, STILL, B); if (s.result) lostAt = s.time; }
+  for (let i = 0; i < 900 * TPS && !s.result; i++) { step(s, STILL, B); if (s.result) lostAt = s.time; }
   assert.equal(s.result, 'lose');
   assert.equal(s.castle.hp, 0);
-  console.log(`  아무것도 안 하면 ${lostAt.toFixed(0)}초(웨이브 ${s.waves.current})에 패배`);
+  console.log(`  아무것도 안 하면 ${lostAt.toFixed(0)}초에 패배`);
 });

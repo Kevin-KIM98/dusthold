@@ -9,6 +9,7 @@ import { createFx } from './fx.js';
 import { createUnitView } from './units.js';
 import { createWallView } from './walls.js';
 import { createGuideView } from './guide.js';
+import { createCampView } from './camps.js';
 import { bakeParts, bakeGroup, vcMaterial } from './merge.js';
 import { buildGrassGround, buildScatter, hash2 } from './decor.js';
 import { swordAngle, SWORD_IDLE } from './anim.js';
@@ -68,6 +69,7 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
   const unitView = createUnitView(scene, balance, art);
   const wallView = createWallView(scene, balance);
   const guideView = createGuideView(scene, balance);
+  const campView = createCampView(scene);
 
   const attack = { yaw: 0, start: -1e9 };
   let lastNow = 0;
@@ -94,6 +96,12 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
         fx.shoot(e.x, e.z, e.tx, e.tz, e.from === 'tower' ? balance.towers.platformHeight + 1.0 : 1.0);
       } else if (e.type === 'enemyDown') {
         fx.puff(e.x, e.z, e.enemy === 'giant' ? 2.5 : 1);
+        fx.burst(e.x, e.z, e.enemy === 'giant' ? 14 : e.enemy === 'shield' ? 4 : 2); // 은화 폭발 연출
+      } else if (e.type === 'campCaptured') {
+        fx.puff(e.x, e.z, 3);
+        fx.burst(e.x, e.z, 40);
+      } else if (e.type === 'buildingDown') {
+        fx.puff(e.x, e.z, 2.2);
       } else if (e.type === 'archerDown' || e.type === 'commanderDown') {
         fx.puff(e.x, e.z, 0.8);
       } else if (e.type === 'wallDown') {
@@ -143,6 +151,7 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
       sun.position.set(focus.x, 0, focus.z).add(sunOffset);
       sun.target.position.set(focus.x, 0, focus.z);
       buildingView.sync(st, now);
+      campView.sync(st);
       wallView.sync(st);
       padView.sync(st, now);
       coinView.sync(st, commander, now);
@@ -286,6 +295,18 @@ function buildCastle(scene, castle, art) {
 }
 
 function buildObstacles(scene, obstacles, art) {
+  const cliffs = obstacles.filter(o => o.kind === 'cliff');
+  if (cliffs.length) {
+    // 절벽: 키 큰 바위를 촘촘히 세워 벽처럼 (꼭대기는 풀)
+    const cliffGeo = bakeParts([
+      { geo: new THREE.DodecahedronGeometry(1, 0).scale(1.25, 2.4, 1.25).translate(0, 1.5, 0), color: 0x8f8a80, flat: true },
+      { geo: new THREE.DodecahedronGeometry(0.9, 0).scale(1.1, 0.35, 1.1).translate(0, 3.6, 0), color: 0x5f8f44, flat: true },
+    ]);
+    const items = cliffs.map(o => ({ x: o.x, z: o.z, rot: o.rot, sx: o.r / 1.3, sy: 0.85 + hash2(o.x, o.z) * 0.4, sz: o.r / 1.3 }));
+    const cm = makeInstanced(cliffGeo, vcMaterial(true), items, { receiveShadow: true });
+    cm.name = 'cliffs';
+    scene.add(cm);
+  }
   const trees = obstacles.filter(o => o.kind === 'tree');
   const rocks = obstacles.filter(o => o.kind === 'rock');
   const tItems = trees.map(t => ({ x: t.x, z: t.z, rot: t.rot, sx: t.scale, sy: t.scale, sz: t.scale }));
@@ -391,11 +412,17 @@ function buildCommander(art) {
   sword.name = 'sword';
   sword.position.set(-0.27, 1.5, 0.02);
   const sm = c => new THREE.MeshLambertMaterial({ color: c });
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.95, 0.03).translate(0, 0.72, 0), sm(0xf2f6fa));
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 4).translate(0, 1.28, 0), sm(0xf2f6fa));
+  // 빛나는 칼 (조명 영향 없이 밝게 + 바깥에 노란 빛)
+  const glowBlade = new THREE.MeshBasicMaterial({ color: 0xfff4c2 });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.95, 0.03).translate(0, 0.72, 0), glowBlade);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 4).translate(0, 1.28, 0), glowBlade);
+  const aura = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.2, 0.16).translate(0, 0.78, 0),
+    new THREE.MeshBasicMaterial({ color: 0xffc83a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+  aura.name = 'swordAura';
   const guard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.07).translate(0, 0.24, 0), sm(COLORS.gold));
   const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).translate(0, 0.12, 0), sm(COLORS.belt));
   for (const m of [blade, tip, guard, grip]) { m.castShadow = true; sword.add(m); }
+  sword.add(aura);
   sword.rotation.x = SWORD_IDLE;
   baked.group.add(sword);
   root.scale.setScalar(COMMANDER_SCALE);

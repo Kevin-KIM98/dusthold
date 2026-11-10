@@ -19,7 +19,10 @@ const DEFAULT_SEED = 1;
 async function boot() {
   const balance = await (await fetch('./data/balance.json')).json();
   const seed = params.has('seed') ? (parseInt(params.get('seed'), 10) >>> 0) : DEFAULT_SEED;
-  const speed = params.has('fast') ? balance.sim.fastMultiplier : 1;
+  // ?fast = 4배속, ?fast=숫자 = 그 배속 (테스트용). 배속이 크면 한 프레임에 돌리는 틱 상한도 같이 늘림
+  const fastN = parseFloat(params.get('fast'));
+  const speed = params.has('fast') ? (fastN > 0 ? fastN : balance.sim.fastMultiplier) : 1;
+  const maxTicks = Math.max(balance.sim.maxTicksPerFrame, Math.ceil(speed * 2));
 
   // 이어하기: 이 브라우저에 저장된 판이 있으면 그 상태로 시작 (?worst 디버그 장면은 저장·불러오기 안 함)
   const worst = params.has('worst');
@@ -75,7 +78,7 @@ async function boot() {
     if (!paused) {
       acc += dt * speed;
       let n = 0;
-      while (acc >= TICK && n < balance.sim.maxTicksPerFrame) {
+      while (acc >= TICK && n < maxTicks) {
         // 테스트용: __game.inputOverride가 있으면 그 입력을 씀 (자동 플레이)
         lastInput = window.__game && window.__game.inputOverride ? window.__game.inputOverride() : controls.read();
         if (lastInput.x || lastInput.z) hud.hideHint();
@@ -83,7 +86,7 @@ async function boot() {
         for (const e of state.events) events.push(e);
         acc -= TICK; n++;
       }
-      if (n === balance.sim.maxTicksPerFrame) acc = 0;
+      if (n === maxTicks) acc = 0;
     }
     const alpha = paused ? 1 : acc / TICK;
     const c = state.commander;

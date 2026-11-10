@@ -8,7 +8,7 @@ import { buildWalls } from './walls.js';
 export function makeWorstScene(state, balance) {
   const w = balance.debug.worst;
   const c = state.commander;
-  state.waves.paused = true; // 일반 웨이브는 멈춤
+  state.spawn.paused = true; // 적 기지는 멈춤 (최악 장면 고정)
   // 기지 전체 (건물·망루 4·성벽) — 그리기 부담이 가장 큰 상태
   for (const def of balance.pads.list) {
     if (def.builds && balance.buildings[def.builds]) addBuilding(state, def.builds, def.x, def.z, balance);

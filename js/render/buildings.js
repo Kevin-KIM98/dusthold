@@ -117,6 +117,8 @@ export function createBuildingView(scene, art = { models: {} }) {
 
   return {
     sync(state, time) {
+      const ids = new Set(state.buildings.map(b => b.id));
+      for (const [id, v] of made) if (!ids.has(id)) { scene.remove(v.g); made.delete(id); } // 부서진 건물
       for (const b of state.buildings) {
         let v = made.get(b.id);
         if (!v) {

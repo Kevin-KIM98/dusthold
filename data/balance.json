@@ -84,6 +84,12 @@
       "minGap": 1.6,
       "maxTries": 2000,
       "keepOffPad": 3
+    },
+    "cliffs": {
+      "radius": 1.3,
+      "spacing": 1.5,
+      "offset": 1.65,
+      "stopOutsideWall": 3.0
     }
   },
   "commander": {
@@ -94,13 +100,14 @@
     "inputDeadzone": 0.12,
     "attack": 30,
     "attackInterval": 0.8,
-    "range": 2.0,
+    "range": 2.2,
     "respawnSeconds": 5,
     "dropFraction": 0.5,
     "dropSpread": 1.2,
     "rangedAttack": 18,
     "rangedInterval": 1.0,
-    "rangedRange": 7
+    "rangedRange": 7,
+    "cleaveMax": 8
   },
   "camera": {
     "pitchDeg": 55,
@@ -125,7 +132,7 @@
     "coinThickness": 0.07,
     "maxFlyingCoins": 60,
     "flySeconds": 0.35,
-    "maxEnemies": 80,
+    "maxEnemies": 220,
     "maxArchers": 40,
     "maxDamageNumbers": 40,
     "maxArrows": 40,
@@ -196,7 +203,8 @@
     },
     "slashSeconds": 0.28,
     "axeFlightSeconds": 0.3,
-    "maxAxes": 6
+    "maxAxes": 6,
+    "maxCliffs": 200
   },
   "coins": {
     "carryMax": 100,
@@ -208,7 +216,7 @@
       "spread": 1.2
     },
     "expire": false,
-    "mergeAbove": 120,
+    "mergeAbove": 250,
     "mergeRadius": 1.2
   },
   "pads": {
@@ -316,7 +324,6 @@
         "requires": [
           "walls"
         ],
-        "minWave": 5,
         "builds": "stoneWalls",
         "sharesSpotWith": "walls"
       }
@@ -333,13 +340,15 @@
       "halfDepth": 0.5,
       "intervalSeconds": 2,
       "max": 40,
-      "collectRadius": 2.0
+      "collectRadius": 2.0,
+      "hp": 250
     },
     "tower": {
       "hp": 500,
       "halfWidth": 1.0,
       "halfDepth": 1.0
-    }
+    },
+    "rebuildCostFactor": 0.5
   },
   "archers": {
     "maxFollowers": 6,
@@ -357,7 +366,7 @@
     "trailStep": 0.3
   },
   "castle": {
-    "hp": 2500
+    "hp": 5000
   },
   "enemies": {
     "aggroRange": 2.0,
@@ -395,41 +404,9 @@
       }
     }
   },
-  "waves": {
-    "total": 10,
-    "firstAt": 25,
-    "interval": 35,
-    "lateInterval": 30,
-    "lateFrom": 6,
-    "base": 3,
-    "perWave": 1.5,
-    "cap": 30,
-    "shield": [
-      {
-        "from": 3,
-        "ratio": 0.2
-      },
-      {
-        "from": 7,
-        "ratio": 0.35
-      }
-    ],
-    "bosses": [
-      {
-        "wave": 5,
-        "count": 1
-      },
-      {
-        "wave": 10,
-        "count": 2
-      }
-    ],
-    "bothPathsFrom": 6,
-    "spawnGap": 0.6
-  },
   "debug": {
     "worst": {
-      "enemies": 60,
+      "enemies": 180,
       "archers": 22,
       "groundCoins": 150,
       "carried": 100,
@@ -442,7 +419,7 @@
     "thickness": 0.6,
     "segmentLength": 5.5,
     "gateLength": 3.6,
-    "woodHp": 900,
+    "woodHp": 1500,
     "stoneHp": 1500
   },
   "towers": {
@@ -472,12 +449,29 @@
     "hideWithin": 1.6
   },
   "save": {
-    "version": 2,
+    "version": 3,
     "intervalSeconds": 3
   },
   "stages": {
     "hpGrowth": 0.35,
     "attackGrowth": 0.2,
-    "sizeGrowth": 0.25
+    "spawnGrowth": 0.25
+  },
+  "camps": {
+    "hp": 1000,
+    "halfSize": 2.2,
+    "inset": 4.0,
+    "spawnFront": 3.0,
+    "startDelaySeconds": 45,
+    "intervalStart": 4.5,
+    "intervalMin": 2.2,
+    "rampSeconds": 480,
+    "shieldStart": 0.1,
+    "shieldMax": 0.4,
+    "giantFirstSeconds": 90,
+    "giantEverySeconds": 100,
+    "maxAlive": 180,
+    "captureCoins": 60,
+    "captureSpread": 3.0
   }
 }

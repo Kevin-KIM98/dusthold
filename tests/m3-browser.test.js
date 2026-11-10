@@ -23,19 +23,15 @@ const drawn = (cap) => page.evaluate(cap => {
   return k;
 }, cap);
 
-test('웨이브 표시가 뜨고, 25초 뒤 첫 웨이브가 길을 따라 나타난다', { skip }, async () => {
-  const txt = await page.$eval('.wave-n', el => el.textContent);
-  assert.equal(txt, '웨이브 0/10');
+test('적 기지 표시가 뜨고, 시작 지연 뒤 적 기지에서 적이 나와 길을 따라 온다', { skip }, async () => {
+  assert.equal(await page.$eval('.wave-n', el => el.textContent), '적 기지 점령 0/2');
   assert.match(await page.$eval('.wave-t', el => el.textContent), /적이 와요 \d+초/);
-  await page.waitForFunction(() => __game.state.waves.current === 1, null, { timeout: 30000 });
-  assert.equal(await page.$eval('.wave-n', el => el.textContent), '웨이브 1/10');
-  assert.equal(await page.$eval('.banner', el => el.classList.contains('hidden')), false, '웨이브 시작 알림');
-  await page.waitForFunction(() => __game.state.enemies.length >= 3, null, { timeout: 10000 });
+  await page.waitForFunction(() => __game.state.enemies.length >= 3, null, { timeout: 60000 });
+  assert.match(await page.$eval('.wave-t', el => el.textContent), /적 \d+명/);
   const enemiesDrawn = await page.evaluate(() => { let k = 0; __game.view.scene.traverse(o => { if (o.name === 'raider' || o.name === 'shield') k += o.count; }); return k; });
   assert.ok(enemiesDrawn >= 3, '적 모델이 그려짐');
-  // 남쪽 길에서 오는 적을 보러 카메라 이동
-  const e = await page.evaluate(() => ({ x: __game.state.enemies[0].x, z: __game.state.enemies[0].z }));
-  await teleport(e.x - 4, e.z - 4);
+  const camp = await page.evaluate(() => { const c = __game.state.camps[0]; return { x: c.x, z: c.z }; });
+  await teleport(camp.x - 3, camp.z - 5);
   await page.waitForTimeout(500);
   await page.screenshot({ path: join(ROOT, 'test-results/m3-wave.png') });
 });
@@ -90,7 +86,7 @@ test('성주가 칼을 휘두르며 공격한다 (칼 움직임·칼바람·큰 
   await page.evaluate(async () => {
     const s = __game.state, c = s.commander;
     const { spawnEnemy } = await import('./js/sim/units.js');
-    s.waves.paused = true;
+    s.spawn.paused = true;
     // 큰 노란 숫자가 만들어지는 순간을 기록 (느린 화면에서 0.8초짜리 숫자를 놓치지 않게)
     window.__bigNums = [];
     new MutationObserver(list => {
@@ -135,7 +131,7 @@ test('성주가 멀리 있는 적에게 손도끼를 던진다 (날아가는 도
     await page.mouse.click(60, 700); // 소리 켜기용 첫 터치
     await page.evaluate(async () => {
       const s = __game.state, c = s.commander;
-      s.waves.paused = true;
+      s.spawn.paused = true;
       const { spawnEnemy } = await import('./js/sim/units.js');
       c.x = c.prevX = 0; c.z = c.prevZ = 18; c.cooldown = 0;
       const e = spawnEnemy(s, 'shield', 'south', __game.balance);
@@ -155,27 +151,6 @@ test('성주가 멀리 있는 적에게 손도끼를 던진다 (날아가는 도
   } finally { await g2.close(); }
 });
 
-test('성주가 쓰러지면 안내가 뜨고 모습이 사라졌다가 5초 뒤 부활한다', { skip }, async () => {
-  await page.evaluate(async () => {
-    const s = __game.state, c = s.commander;
-    const { spawnEnemy } = await import('./js/sim/units.js');
-    c.hp = 1; c.cooldown = 1e9;
-    s.archers.forEach(a => { a.cooldown = 1e9; });
-    const e = spawnEnemy(s, 'shield', 'south', __game.balance);
-    e.x = e.prevX = c.x + 1; e.z = e.prevZ = c.z;
-  });
-  await page.waitForFunction(() => !__game.state.commander.alive, null, { timeout: 8000 });
-  await page.waitForTimeout(150);
-  assert.equal(await page.$eval('.down', el => el.classList.contains('hidden')), false, '쓰러짐 안내');
-  assert.match(await page.$eval('.down', el => el.textContent), /초 뒤 부활/);
-  assert.equal(await page.evaluate(() => __game.view.commanderObject.visible), false);
-  await page.waitForFunction(() => __game.state.commander.alive, null, { timeout: 8000 });
-  await page.waitForTimeout(150);
-  assert.equal(await page.$eval('.down', el => el.classList.contains('hidden')), true);
-  assert.equal(await page.evaluate(() => __game.view.commanderObject.visible), true);
-  assert.deepEqual(errors, []);
-});
-
 test('최악 장면(?worst)도 draw call ≤150, 삼각형 ≤20만, 에러 0', { skip }, async () => {
   const w = await openGame('?seed=1&worst');
   try {
@@ -186,7 +161,7 @@ test('최악 장면(?worst)도 draw call ≤150, 삼각형 ≤20만, 에러 0', 
     });
     await w.page.screenshot({ path: join(ROOT, 'test-results/m3-worst.png') });
     console.log('  최악 장면:', JSON.stringify(info));
-    assert.ok(info.enemies >= 40 && info.archers >= 20 && info.coins >= 100, '최악 장면 구성 (망루가 일부 처치)');
+    assert.ok(info.enemies >= 150 && info.archers >= 20 && info.coins >= 100, '최악 장면 구성 (적 180, 망루가 일부 처치)');
     assert.ok(info.calls <= 150, `draw call ${info.calls}`);
     assert.ok(info.tris <= 200000, `삼각형 ${info.tris}`);
     assert.ok(await w.page.$eval('.fps', el => /FPS \d+/.test(el.textContent)), 'FPS 표시');

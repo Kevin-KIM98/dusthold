@@ -40,7 +40,7 @@ test('바닥 화살표가 다음 목표(처음엔 은화 더미)를 가리키고
   assert.equal(b.n, 0, '목표에 서 있으면 화살표 없음');
 });
 
-test('효과음: 줍기·납부·해금·타격·웨이브 시작에 소리가 나고, 음소거 버튼이 동작한다', { skip }, async () => {
+test('효과음: 줍기·납부·해금·타격·적 기지 점령(나팔)에 소리가 나고, 음소거 버튼이 동작한다', { skip }, async () => {
   // 첫 터치로 소리 켜짐
   await page.mouse.click(100, 600);
   await page.waitForFunction(() => __game.sound.stats().ready, null, { timeout: 3000 });
@@ -57,8 +57,8 @@ test('효과음: 줍기·납부·해금·타격·웨이브 시작에 소리가 �
     e.x = e.prevX = c.x + 1; e.z = e.prevZ = c.z + 0.5; e.wp = 99;
   });
   await page.waitForTimeout(1500); // 줍기 + 납부(막사 6) + 해금 + 타격
-  await page.evaluate(() => { const s = __game.state; s.tick = Math.round(__game.balance.waves.firstAt / __game.balance.sim.tickSeconds) - 2; });
-  await page.waitForFunction(() => __game.state.waves.current >= 1, null, { timeout: 3000 });
+  await page.evaluate(() => { __game.state.camps[0].hp = 0; }); // 적 기지 점령 → 나팔
+  await page.waitForFunction(() => __game.state.camps[0].captured, null, { timeout: 3000 });
   await page.waitForTimeout(200);
   const st = await page.evaluate(() => __game.sound.stats());
   for (const k of ['pickup', 'pay', 'unlock', 'hit', 'wave']) assert.ok(st[k] > 0, `${k} 소리 ${JSON.stringify(st)}`);
@@ -78,8 +78,8 @@ test('효과음: 줍기·납부·해금·타격·웨이브 시작에 소리가 �
 test('실제 페이지에서 한 판을 끝까지(자동 플레이) — 결과 화면까지, Node 결과와 같다', { skip, timeout: 420000 }, async () => {
   const B = loadBalance();
   const seed = 5;
-  const expect = playGame(createState, B, seed);
-  const g = await openGame(`?seed=${seed}&fast`);
+  const expect = playGame(createState, B, seed, 900);
+  const g = await openGame(`?seed=${seed}&fast=40`);
   try {
     // 자동 플레이어를 붙이면서 같은 작업 안에서 상태를 처음으로 되돌림 → Node와 같은 출발점
     await g.page.evaluate(async () => {
@@ -91,11 +91,11 @@ test('실제 페이지에서 한 판을 끝까지(자동 플레이) — 결과 �
       __game.inputOverride = () => botInput(__game.state, __game.balance);
     });
     await g.page.waitForSelector('.result:not(.hidden)', { timeout: 400000 });
-    const got = await g.page.evaluate(() => ({ result: __game.state.result, wave: __game.state.waves.current, title: document.querySelector('.r-title').textContent }));
+    const got = await g.page.evaluate(() => ({ result: __game.state.result, tick: __game.state.tick, title: document.querySelector('.r-title').textContent }));
     await g.page.screenshot({ path: join(ROOT, 'test-results/m5-fullgame.png') });
-    console.log(`  페이지 자동 플레이: ${got.result} (웨이브 ${got.wave}) / Node: ${expect.result} (웨이브 ${expect.waves.current})`);
+    console.log(`  페이지 자동 플레이: ${got.result} (${got.tick}틱) / Node: ${expect.result} (${expect.tick}틱)`);
     assert.equal(got.result, expect.result);
-    assert.equal(got.wave, expect.waves.current);
+    assert.equal(got.tick, expect.tick, '같은 틱에 끝남');
     assert.equal(got.title, expect.result === 'win' ? '스테이지 1 클리어!' : '성채가 무너졌어요');
     assert.deepEqual(g.errors, []);
   } finally { await g.close(); }

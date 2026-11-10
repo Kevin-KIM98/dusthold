@@ -14,7 +14,7 @@ async function base(page) {
     const { addBuilding } = await import('./js/sim/buildings.js');
     const { buildWalls } = await import('./js/sim/walls.js');
     const { spawnArchers, spawnEnemy } = await import('./js/sim/units.js');
-    s.waves.paused = true;
+    s.spawn.paused = true;
     s.coins = s.coins.slice(0, 8);
     for (const id of ['barracks', 'taxTable', 'walls', 'tower1', 'tower2']) s.pads.find(p => p.id === id).done = true;
     s.unlocked.barracks = s.unlocked.taxTable = s.unlocked.walls = s.unlocked.tower = true;

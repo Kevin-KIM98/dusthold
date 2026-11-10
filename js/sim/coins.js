@@ -1,7 +1,22 @@
 // 바닥 은화: 생성 · 수명 · 성주가 지나가면 줍기
 import { range } from './rng.js';
+import { pushOutOfBox, pushOutOfCircle, clampToBounds } from './collision.js';
+
+/** 은화가 성채·건물·성벽·절벽·나무 안에 떨어지면 못 주우니 바깥 가장자리로 밀어냄 */
+function placeReachable(state, x, z, balance) {
+  const p = { x, z }, r = 0.25;
+  for (let pass = 0; pass < 2; pass++) {
+    pushOutOfBox(p, r, state.castle);
+    for (const b of state.buildings) pushOutOfBox(p, r, b);
+    for (const w of state.walls) pushOutOfBox(p, r, w);
+    for (const o of state.obstacles) pushOutOfCircle(p, r, o);
+    clampToBounds(p, r, balance.map.halfSize);
+  }
+  return p;
+}
 
 export function spawnCoin(state, x, z, permanent = false, balance) {
+  ({ x, z } = placeReachable(state, x, z, balance));
   // 기본은 사라지지 않음(-1). coins.expire=true + lifetimeSeconds가 있을 때만 수명
   const ttl = permanent || !balance.coins.expire ? -1 : Math.round(balance.coins.lifetimeSeconds / balance.sim.tickSeconds);
   // 바닥 은화가 많으면 가까운 은화에 합쳐 더미로 (돈은 그대로, 개수만 줄임)
