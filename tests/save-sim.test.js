@@ -40,14 +40,19 @@ test('쓸 수 없는 저장은 버린다: 망가진 데이터·버전 다름·�
   assert.equal(deserialize(null, B), null);
   const other = JSON.parse(JSON.stringify(B)); other.save.version += 1;
   assert.equal(deserialize(good, other), null, '버전 다름');
+  const reordered = JSON.parse(JSON.stringify(B)); reordered.pads.list.reverse();
+  assert.equal(deserialize(good, reordered), null, '패드 구성(순서) 바뀜');
+  // 새 패드가 끝에 추가된 경우는 그 패드만 붙여서 이어감 (예: 돌격대 막사)
   const morePads = JSON.parse(JSON.stringify(B)); morePads.pads.list.push({ id: 'newPad', x: 0, z: 0, cost: 1, requires: [] });
-  assert.equal(deserialize(good, morePads), null, '패드 구성 바뀜');
+  const ext = deserialize(good, morePads);
+  assert.ok(ext && ext.pads.some(p => p.id === 'newPad'), '추가된 패드는 붙여서 이어감');
   a.result = 'lose';
   assert.equal(deserialize(serialize(a, B), B), null, '끝난 판은 이어하지 않음');
 });
 
 test('요약: 스테이지·점령한 적 기지·은화', () => {
   const a = createState(B, 1);
+  a.coins = []; // 줍기 반경이 넓어 시작 은화를 바로 주우므로 치움
   a.commander.coins = 12; a.camps[0].captured = true;
   for (let i = 0; i < 40; i++) step(a, { x: 0, z: 0 }, B);
   const s = summary(a);

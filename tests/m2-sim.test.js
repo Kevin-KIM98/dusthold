@@ -34,11 +34,12 @@ test('시작할 때 은화 25개가 바닥에 있고, 시간이 지나도 사라
   assert.equal(s.coins.length, B.coins.start.count);
 });
 
-test('은화 근처(1.5m)를 지나가면 줍고 들고 있는 수가 오른다, 멀면 안 줍는다', () => {
+test('은화 근처(줍기 반경 안)를 지나가면 줍고 들고 있는 수가 오른다, 멀면 안 줍는다', () => {
   const s = fresh();
   place(s, 0, 12);
-  spawnCoin(s, 1.4, 12, false, B);  // 1.4m: 주움
-  spawnCoin(s, 0, 14, false, B);    // 2m: 안 주움
+  const R = B.coins.pickupRadius;
+  spawnCoin(s, R - 0.1, 12, false, B);  // 반경 안: 주움
+  spawnCoin(s, 0, 12 + R + 0.5, false, B); // 반경 밖: 안 주움
   step(s, STILL, B);
   assert.equal(s.commander.coins, 1);
   assert.equal(s.coins.length, 1);
@@ -237,7 +238,7 @@ test('처음부터 끝까지: 은화 줍기 → 막사 → 세금 탁자 → 모
     assert.ok(s.unlocked.taxTable);
     assert.equal(s.commander.coins, 25 - 6 - 15);
     // 세금이 쌓일 때까지 기다렸다가 가져가서 모집 패드에
-    walk(tp.x, tp.z + 3);
+    walk(tp.x + 2.2, tp.z); walk(tp.x, tp.z + 3); // 탁자를 돌아서
     run(s, STILL, TPS * 30);
     walk(tp.x, tp.z + 1.5);
     assert.ok(s.commander.coins >= 8 + 4, `세금 수거 후 ${s.commander.coins}`);
@@ -254,9 +255,11 @@ test('바닥 은화가 많으면 가까운 은화와 합쳐 더미가 되고, �
   const s = fresh();
   place(s, -25, -25);
   const C = B.coins;
-  for (let i = 0; i < C.mergeAbove; i++) spawnCoin(s, -10 + (i % 12) * 2, 10 + Math.floor(i / 12) * 2, false, B);
+  // 많은 은화는 멀리(북서쪽 모서리), 더미는 (0,20) 하나만 따로
+  for (let i = 0; i < C.mergeAbove - 1; i++) spawnCoin(s, -30 + (i % 16) * 1.5, -30 + Math.floor(i / 16) * 1.5, false, B);
+  spawnCoin(s, 0, 20, false, B);
   assert.equal(s.coins.length, C.mergeAbove);
-  for (let i = 0; i < 30; i++) spawnCoin(s, 0.1, 10.1, false, B); // 이미 있는 은화(0,10 근처)에 합쳐짐
+  for (let i = 0; i < 30; i++) spawnCoin(s, 0.1, 20.1, false, B); // (0,20) 은화에 합쳐짐
   assert.equal(s.coins.length, C.mergeAbove, '개수는 안 늘어남');
   const total = s.coins.reduce((a, k) => a + (k.value || 1), 0);
   assert.equal(total, C.mergeAbove + 30, '돈은 하나도 안 사라짐');

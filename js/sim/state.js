@@ -38,6 +38,8 @@ export function createState(balance, seed) {
     enemies: [],
     spawn: { startTick: 0, paused: false },
     camps: [],
+    soldiers: [],
+    soldierTurn: 0,
     kills: 0,
     walls: [],
     wallLevel: 0,

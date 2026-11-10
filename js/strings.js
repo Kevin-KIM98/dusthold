@@ -7,7 +7,7 @@ export const STR = {
   loadError: '게임을 불러오지 못했어요. 새로고침해 주세요.',
   fps: 'FPS',
   coinsLabel: '들고 있는 은화',
-  pads: { barracks: '궁수 막사', recruit: '궁수 모집', taxTable: '세금 탁자', walls: '성벽', tower1: '망루', tower2: '망루', tower3: '망루', tower4: '망루', towerUpgrade: '망루 강화', stoneWalls: '돌벽' },
+  pads: { barracks: '궁수 막사', recruit: '궁수 모집', taxTable: '세금 탁자', walls: '성벽', tower1: '망루', tower2: '망루', tower3: '망루', tower4: '망루', towerUpgrade: '망루 강화', stoneWalls: '돌벽', warCamp: '돌격대 막사' },
   win: '승리!',
   lose: '성채가 무너졌어요',
   kills: n => `처치한 적 ${n}`,

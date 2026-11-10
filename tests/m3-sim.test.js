@@ -50,7 +50,8 @@ test('궁수는 사거리(6m) 안 적을 쏘고, 적 체력이 0이면 사라지
   const far = () => Math.hypot(e.x - a.x, e.z - a.z) - B.enemies.types.raider.radius;
   run(s, STILL, 1);
   if (far() > B.archers.range) assert.equal(e.hp, B.enemies.types.raider.hp, '사거리 밖이면 안 쏨');
-  const coinsBefore = s.coins.length;
+  const money = () => s.coins.reduce((a, k) => a + (k.value || 1), 0) + s.commander.coins; // 성주가 바로 주울 수도 있음
+  const coinsBefore = money();
   place(e, a.x + 4, a.z);
   run(s, STILL, 1);
   assert.ok(e.hp < B.enemies.types.raider.hp, '사거리 안이면 쏨');
@@ -58,7 +59,7 @@ test('궁수는 사거리(6m) 안 적을 쏘고, 적 체력이 0이면 사라지
   for (let i = 0; i < 6 * TPS && s.enemies.includes(e); i++) { place(e, a.x + 4, a.z); step(s, STILL, B); }
   assert.ok(!s.enemies.includes(e), '죽으면 사라짐');
   assert.equal(s.kills, 1);
-  assert.equal(s.coins.length - coinsBefore, B.enemies.types.raider.coins, '은화 떨어뜨림');
+  assert.equal(money() - coinsBefore, B.enemies.types.raider.coins, '은화 떨어뜨림');
 });
 
 test('성주는 사거리 안 적을 공격 간격마다 공격력만큼 때린다 (궁수보다 훨씬 셈)', () => {

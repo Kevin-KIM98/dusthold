@@ -95,7 +95,7 @@
   "commander": {
     "hp": 300,
     "radius": 0.5,
-    "speed": 5.5,
+    "speed": 8.0,
     "turnRate": 14,
     "inputDeadzone": 0.12,
     "attack": 30,
@@ -204,11 +204,12 @@
     "slashSeconds": 0.28,
     "axeFlightSeconds": 0.3,
     "maxAxes": 6,
-    "maxCliffs": 200
+    "maxCliffs": 200,
+    "maxSoldiers": 16
   },
   "coins": {
     "carryMax": 100,
-    "pickupRadius": 1.5,
+    "pickupRadius": 5.0,
     "start": {
       "count": 25,
       "x": 2.5,
@@ -326,6 +327,16 @@
         ],
         "builds": "stoneWalls",
         "sharesSpotWith": "walls"
+      },
+      {
+        "id": "warCamp",
+        "x": 5.5,
+        "z": -7.5,
+        "cost": 40,
+        "requires": [
+          "barracks"
+        ],
+        "builds": "warCamp"
       }
     ]
   },
@@ -348,7 +359,11 @@
       "halfWidth": 1.0,
       "halfDepth": 1.0
     },
-    "rebuildCostFactor": 0.5
+    "rebuildCostFactor": 0.5,
+    "warCamp": {
+      "halfWidth": 1.4,
+      "halfDepth": 1.1
+    }
   },
   "archers": {
     "maxFollowers": 6,
@@ -356,7 +371,7 @@
     "attack": 10,
     "attackInterval": 1.0,
     "range": 6,
-    "speed": 6.2,
+    "speed": 9.0,
     "radius": 0.35,
     "slotSide": 1.1,
     "slotBack": 1.5,
@@ -473,5 +488,16 @@
     "maxAlive": 180,
     "captureCoins": 60,
     "captureSpread": 3.0
+  },
+  "soldiers": {
+    "spawnSeconds": 6,
+    "max": 10,
+    "attack": 14,
+    "attackInterval": 1.0,
+    "reach": 1.0,
+    "aggroRange": 3.0,
+    "speed": 3.2,
+    "radius": 0.35,
+    "waypointReach": 0.8
   }
 }

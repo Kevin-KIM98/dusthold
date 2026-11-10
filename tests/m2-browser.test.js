@@ -21,13 +21,23 @@ const padVisible = id => page.$eval(`.pad-label[data-pad="${id}"]`, el => el.sty
 const teleport = (x, z) => page.evaluate(([x, z]) => { const c = __game.state.commander; c.x = c.prevX = x; c.z = c.prevZ = z; }, [x, z]);
 
 test('은화 더미로 걸어가면 등 뒤에 쌓이고 상단 숫자가 오른다', { skip }, async () => {
+  // 줍기 반경이 넓어(5m) 시작 더미는 바로 주워짐 → 비우고, 더미를 떨어진 곳에 다시 놓고 걸어가서 확인
+  await page.evaluate(async () => {
+    const s = __game.state; s.commander.coins = 0; s.coins = [];
+    const { spawnCoin } = await import('./js/sim/coins.js');
+    for (let i = 0; i < 25; i++) spawnCoin(s, -6.6 + (i % 5) * 0.3, 7.2 + Math.floor(i / 5) * 0.3, false, __game.balance); // 성벽 안, 시작 위치에서 5m 넘게
+  });
+  await page.waitForTimeout(200);
   assert.equal(await hudCoins(), 0);
-  const st = await page.evaluate(() => __game.balance.coins.start);
+  const st = { x: -6, z: 7.8 };
   await teleport(st.x - 3, st.z);
   // 정확히 동쪽(+x)으로 더미 한가운데를 지나가게 (키 두 개를 누르는 시간차에 따라 결과가 달라지지 않도록 테스트용 입력 사용)
   await page.evaluate(() => { __game.inputOverride = () => ({ x: 1, z: 0 }); });
-  await page.waitForFunction(x => __game.state.commander.x >= x, st.x + 1.6, { timeout: 10000 });
-  await page.evaluate(() => { __game.inputOverride = null; });
+  try {
+    await page.waitForFunction(x => __game.state.commander.x >= x, st.x + 1.6, { timeout: 10000 });
+  } finally {
+    await page.evaluate(() => { __game.inputOverride = null; }); // 실패해도 다음 테스트에 영향 없게
+  }
   await page.waitForTimeout(400);
   const n = await page.evaluate(() => __game.state.commander.coins);
   assert.ok(n >= 20, `주운 은화 ${n}`);

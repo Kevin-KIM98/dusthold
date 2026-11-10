@@ -19,6 +19,7 @@ function wonState() {
   addBuilding(s, 'barracks', -7, 3, B); s.unlocked.barracks = true; s.pads.find(p => p.id === 'barracks').done = true;
   buildWalls(s, B, 1); s.unlocked.walls = true; s.pads.find(p => p.id === 'walls').done = true;
   s.walls = s.walls.slice(3);
+  s.coins = []; // 줍기 반경이 넓어 시작 은화를 바로 주우므로 치움
   s.commander.coins = 57;
   s.castle.hp = 321;
   for (const c of s.camps) c.hp = 0;
@@ -69,7 +70,7 @@ test('저장: 클리어 화면에서 나갔다가 오면 다음 스테이지부�
   assert.equal(loaded.stage, 2);
   assert.equal(loaded.result, null);
   assert.equal(loaded.commander.coins, 57);
-  const v2 = createState(B, 1); run(v2, 10);
+  const v2 = createState(B, 1); v2.coins = []; run(v2, 10);
   v2.commander.coins = 33;
   const data = JSON.parse(serialize(v2, B));
   data.v = 2; data.state.waves = { current: 4, queue: [], paused: false, startTick: 0 };

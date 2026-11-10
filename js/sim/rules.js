@@ -5,6 +5,7 @@ import { updateCoins } from './coins.js';
 import { updatePads, refreshPads } from './pads.js';
 import { updateBuildings } from './buildings.js';
 import { updateCamps } from './camps.js';
+import { updateSoldiers } from './soldiers.js';
 import { updateArchers, updateEnemies } from './units.js';
 import { updateCombat, dropEnemyCoins } from './combat.js';
 
@@ -14,6 +15,7 @@ export function step(state, input, balance) {
   moveCommander(state, input, balance);
   updateCamps(state, balance);
   updateArchers(state, balance);
+  updateSoldiers(state, balance);
   updateEnemies(state, balance);
   updateCombat(state, balance);
   updateCoins(state, balance);

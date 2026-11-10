@@ -53,6 +53,19 @@ function archerParts() {
   ];
 }
 
+// 돌격병: 파란 갑옷 + 은색 투구 + 긴 창 + 파란 둥근 방패 (아군 색 = 파랑)
+function soldierParts() {
+  const shield = new THREE.CylinderGeometry(0.3, 0.3, 0.07, 10).rotateX(Math.PI / 2).translate(-0.3, 0.6, 0.2);
+  return [
+    { geo: g.cyl(0.2, 0.3, 0.75, 0.38), color: 0x2f5fa8 },
+    { geo: g.sph(0.16, 0.92), color: 0xedc099 },
+    { geo: g.cone(0.2, 0.32, 1.12), color: 0xc9cfd6 },
+    { geo: g.box(0.05, 1.5, 0.05, 0.28, 0.85, 0.15), color: 0x7a4a26 },          // 창 자루
+    { geo: new THREE.ConeGeometry(0.07, 0.25, 4).translate(0.28, 1.72, 0.15), color: 0xe3e8ee }, // 창날
+    { geo: shield, color: 0x3f86d8 },
+  ];
+}
+
 function raiderParts() {
   return [
     { geo: g.cyl(0.2, 0.3, 0.7, 0.35), color: 0x6b4a32 },     // 가죽 옷
@@ -103,6 +116,7 @@ export function createUnitView(scene, balance, art = { models: {} }) {
       : makeRig(scene, parts, max, slot);
   };
   const archers = rig('archer', archerParts(), r.maxArchers);
+  const soldiers = rig('soldier', soldierParts(), r.maxSoldiers);
   const enemies = {
     raider: rig('raider', raiderParts(), r.maxEnemies),
     shield: rig('shield', shieldParts(), r.maxEnemies),
@@ -144,6 +158,7 @@ export function createUnitView(scene, balance, art = { models: {} }) {
         });
       }
       archers.sync(archerItems);
+      soldiers.sync((state.soldiers || []).map(sd => pose(sd, alpha, now, 0.09)));
       const byType = { raider: [], shield: [], giant: [] };
       for (const e of state.enemies) {
         const p = pose(e, alpha, now, e.type === 'giant' ? 0.12 : 0.07);

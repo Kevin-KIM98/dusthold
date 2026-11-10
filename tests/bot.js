@@ -2,28 +2,32 @@
 // 은화 줍기 → 세금 걷기 → 살 수 있는 패드 사기(정해진 순서) → 없으면 적이 오는 성문 안쪽에서 방어
 import { step } from '../js/sim/rules.js';
 
-const ORDER = ['barracks', 'recruit', 'taxTable', 'walls', 'tower1', 'tower3', 'tower2', 'tower4', 'stoneWalls', 'towerUpgrade'];
+const ORDER = ['barracks', 'recruit', 'taxTable', 'walls', 'tower1', 'tower3', 'warCamp', 'tower2', 'tower4', 'stoneWalls', 'towerUpgrade'];
 
-/** 성채를 가로지르면 가장 가까운 모서리로 돌아간다 */
+/** 성채·건물을 가로지르면 모서리를 거쳐 가는 가장 짧은 길로 돌아간다 */
 function aroundCastle(s, B, x, z) {
-  const c = s.commander, k = s.castle, m = B.commander.radius + 0.9;
-  const box = { x: k.x, z: k.z, hw: k.halfWidth + m, hd: k.halfDepth + m };
+  const c = s.commander, m = B.commander.radius + 0.6;
+  const boxes = [s.castle, ...s.buildings].map(k => ({ x: k.x, z: k.z, hw: k.halfWidth + m, hd: k.halfDepth + m }));
+  const inBox = (px, pz) => boxes.some(b => Math.abs(px - b.x) < b.hw && Math.abs(pz - b.z) < b.hd);
   const crosses = (ax, az, bx, bz) => {
-    for (let i = 1; i < 20; i++) {
-      const t = i / 20, px = ax + (bx - ax) * t, pz = az + (bz - az) * t;
-      if (Math.abs(px - box.x) < box.hw && Math.abs(pz - box.z) < box.hd) return true;
-    }
+    const n = Math.max(4, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.3));
+    for (let i = 1; i < n; i++) { const t = i / n; if (inBox(ax + (bx - ax) * t, az + (bz - az) * t)) return true; }
     return false;
   };
-  // 목표가 성채 바로 옆(여유 안)이면 여유 바깥 가장 가까운 점으로 (줍기 반경이 넉넉해서 거기서도 주워짐)
-  if (Math.abs(x - box.x) < box.hw && Math.abs(z - box.z) < box.hd) {
-    const ex = box.hw - Math.abs(x - box.x), ez = box.hd - Math.abs(z - box.z);
-    if (ex < ez) x = box.x + Math.sign(x - box.x || 1) * (box.hw + 0.05);
-    else z = box.z + Math.sign(z - box.z || 1) * (box.hd + 0.05);
+  // 목표가 어떤 상자 여유 안이면 그 상자 바깥 가장 가까운 점으로 (줍기 반경이 넉넉해서 거기서도 됨)
+  for (const b of boxes) {
+    if (Math.abs(x - b.x) < b.hw && Math.abs(z - b.z) < b.hd) {
+      const ex = b.hw - Math.abs(x - b.x), ez = b.hd - Math.abs(z - b.z);
+      if (ex < ez) x = b.x + Math.sign(x - b.x || 1) * (b.hw + 0.05);
+      else z = b.z + Math.sign(z - b.z || 1) * (b.hd + 0.05);
+    }
   }
   if (!crosses(c.x, c.z, x, z)) return [x, z];
-  // 성채 네 모서리를 거쳐 가는 가장 짧은 길 (매 틱 같은 답이 나와야 왔다 갔다 하지 않음)
-  const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([sx, sz]) => [box.x + sx * (box.hw + 0.3), box.z + sz * (box.hd + 0.3)]);
+  const corners = [];
+  for (const b of boxes) for (const [sx, sz] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) {
+    const p = [b.x + sx * (b.hw + 0.3), b.z + sz * (b.hd + 0.3)];
+    if (!inBox(p[0], p[1])) corners.push(p);
+  }
   const nodes = [[c.x, c.z], ...corners, [x, z]];
   const n = nodes.length, dist = Array(n).fill(Infinity), prev = Array(n).fill(-1), done = Array(n).fill(false);
   dist[0] = 0;
@@ -40,10 +44,9 @@ function aroundCastle(s, B, x, z) {
       if (nd < dist[v]) { dist[v] = nd; prev[v] = u; }
     }
   }
-  if (prev[n - 1] < 0) return corners[0];
+  if (prev[n - 1] < 0) return [x, z];
   const route = [];
   for (let v = n - 1; v > 0; v = prev[v]) route.unshift(v);
-  // 이미 서 있는 모서리는 건너뛰고 그다음 지점으로
   for (const v of route) if (Math.hypot(nodes[v][0] - c.x, nodes[v][1] - c.z) > 0.4) return nodes[v];
   return [x, z];
 }

@@ -1,6 +1,7 @@
 // 스테이지: 적 기지 2곳을 모두 점령하면 다음 스테이지로. 기지·은화는 이어지고 적은 점점 강해진다.
 import { buildWalls } from './walls.js';
 import { createCamps } from './camps.js';
+import { resetSoldiers } from './soldiers.js';
 export { stageScale } from './scale.js';
 
 /** 이긴 판 → 다음 스테이지 시작 상태로 (기지·은화 유지, 성채·성벽 정비, 적 기지 새로) */
@@ -16,6 +17,7 @@ export function nextStage(state, balance) {
     if (wp && wp.rebuild) { wp.done = true; wp.rebuild = false; wp.paid = 0; }
   }
   state.camps = createCamps(state, balance);
+  resetSoldiers(state);
   const c = state.commander;
   if (!c.alive) {
     const s = balance.map.commanderStart;

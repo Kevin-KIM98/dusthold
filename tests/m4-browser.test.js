@@ -95,7 +95,10 @@ test('"다시 하기"를 누르면 처음 상태로 돌아간다', { skip }, asy
     result: __game.state.result, buildings: __game.state.buildings.length, walls: __game.state.walls.length,
     coins: __game.state.coins.length, castle: __game.state.castle.hp, wave: __game.state.camps.filter(c => c.captured).length, carried: __game.state.commander.coins,
   }));
-  assert.deepEqual(s, { result: null, buildings: 0, walls: 0, coins: 25, castle: castleHp, wave: 0, carried: 0 });
+  // 시작 은화 25개는 바닥 + 이미 주운 것(줍기 반경 5m라 바로 주워짐)
+  assert.equal(s.coins + s.carried, 25, '시작 은화 25개');
+  delete s.coins; delete s.carried;
+  assert.deepEqual(s, { result: null, buildings: 0, walls: 0, castle: castleHp, wave: 0 });
   assert.equal(await page.$eval('.result', el => el.classList.contains('hidden')), true);
 });
 

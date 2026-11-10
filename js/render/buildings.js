@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { bakeGroup } from './merge.js';
 
-const C = { stone: 0xb7ae9c, stoneDark: 0x8f8775, wall: 0xe9dfc8, window: 0x2b2a33, green: 0x3d8a46, cream: 0xf3e6c4, roofDark: 0x8a2f22, wood: 0x8a5a34, woodDark: 0x5e3b22, roof: 0xb4432f, straw: 0xd9b36a, target: 0xf3efe2, red: 0xc4342b, cloth: 0x2f5f9e, gold: 0xe0b23c };
+const C = { stone: 0xb7ae9c, stoneDark: 0x8f8775, wall: 0xe9dfc8, window: 0x2b2a33, green: 0x3d8a46, cream: 0xf3e6c4, roofDark: 0x8a2f22, wood: 0x8a5a34, woodDark: 0x5e3b22, roof: 0xb4432f, straw: 0xd9b36a, target: 0xf3efe2, red: 0xc4342b, cloth: 0x3f86d8, gold: 0xe0b23c };
 const POP_SECONDS = 0.45;
 
 export function createBuildingView(scene, art = { models: {} }) {
@@ -71,6 +71,21 @@ export function createBuildingView(scene, art = { models: {} }) {
       part(flag, new THREE.BoxGeometry(0.7, 0.4, 0.04), M.gold, 0.35, 7.75, 0);
       flag.visible = false;
       g.add(flag);
+      return g;
+    },
+    warCamp(b) {
+      // 돌격대 막사: 돌 받침 위 긴 목조 막사 + 파란 지붕 + 창 거치대 + 파란 깃발
+      const g = new THREE.Group();
+      const hw = b.halfWidth, hd = b.halfDepth, w = hw * 2, d = hd * 2;
+      part(g, new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2), M.stone, 0, 0.15, 0);
+      part(g, new THREE.BoxGeometry(w, 1.3, d), M.wood, 0, 0.95, 0);
+      const roof = part(g, new THREE.CylinderGeometry(d * 0.7, d * 0.7, w + 0.4, 3), M.cloth, 0, 2.05, 0);
+      roof.rotation.z = Math.PI / 2; roof.rotation.x = Math.PI / 2;
+      part(g, new THREE.BoxGeometry(0.8, 1.0, 0.06), M.woodDark, 0, 0.8, hd + 0.03);
+      for (let i = 0; i < 4; i++) part(g, new THREE.BoxGeometry(0.05, 1.3, 0.05), M.woodDark, hw + 0.35, 0.95, -0.45 + i * 0.3); // 창
+      part(g, new THREE.BoxGeometry(0.1, 0.08, 1.2), M.wood, hw + 0.35, 1.1, 0);
+      part(g, new THREE.CylinderGeometry(0.04, 0.04, 1.6, 5), M.woodDark, -hw + 0.1, 2.4, hd + 0.1);
+      part(g, new THREE.BoxGeometry(0.55, 0.38, 0.04), M.cloth, -hw + 0.38, 2.95, hd + 0.1);
       return g;
     },
     taxTable(b) {

@@ -110,6 +110,19 @@ export function updateCombat(state, balance) {
     a.cooldown = ticks(acfg.attackInterval, balance);
   }
 
+  // 돌격병: 손 닿는 적, 없으면 손 닿는 적 기지
+  const scfg = balance.soldiers;
+  for (const sd of state.soldiers) {
+    if (sd.cooldown > 0) sd.cooldown -= 1;
+    if (sd.cooldown > 0) continue;
+    const t = pickTarget(state, sd.x, sd.z, scfg.reach + scfg.radius, balance);
+    if (!t) continue;
+    sd.angle = Math.atan2(t.x - sd.x, t.z - sd.z);
+    strike(state, t, scfg.attack, sd.x, sd.z, balance, 'soldier');
+    state.events.push({ type: 'stab', x: sd.x, z: sd.z, tx: t.x, tz: t.z });
+    sd.cooldown = ticks(scfg.attackInterval, balance);
+  }
+
   // 망루 궁수 (망루마다 4명, 고정 사격, 무적)
   const tcfg = balance.towers;
   for (const b of state.buildings) {

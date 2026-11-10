@@ -3,6 +3,7 @@
 import { nextStage } from './stages.js';
 import { createState } from './state.js';
 import { createCamps } from './camps.js';
+import { createPads } from './pads.js';
 
 /** 상태 → 저장 문자열 */
 export function serialize(state, balance) {
@@ -33,8 +34,16 @@ export function deserialize(text, balance) {
   }
   if (data.v !== balance.save.version) return null;
   const ids = balance.pads.list.map(p => p.id);
-  if (!Array.isArray(data.pads) || data.pads.join(',') !== ids.join(',')) return null;
+  if (!Array.isArray(data.pads)) return null;
   const s = data.state;
+  // 새 패드가 목록 끝에 추가된 경우(예: 돌격대 막사)는 그 패드만 새로 붙여서 이어감
+  if (data.pads.join(',') !== ids.join(',')) {
+    const isPrefix = data.pads.every((id, i) => ids[i] === id);
+    if (!isPrefix || !Array.isArray(s.pads)) return null;
+    const fresh = createPads(balance);
+    for (let i = data.pads.length; i < ids.length; i++) s.pads.push(fresh[i]);
+  }
+  if (!s.soldiers) { s.soldiers = []; s.soldierTurn = 0; }
   const need = ['tick', 'rng', 'commander', 'castle', 'pads', 'coins', 'buildings', 'walls', 'archers', 'enemies', 'spawn', 'camps', 'obstacles', 'paths'];
   if (need.some(k => s[k] === undefined)) return null;
   s.events = [];
