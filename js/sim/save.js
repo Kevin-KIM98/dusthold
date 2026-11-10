@@ -44,6 +44,7 @@ export function deserialize(text, balance) {
     for (let i = data.pads.length; i < ids.length; i++) s.pads.push(fresh[i]);
   }
   if (!s.soldiers) { s.soldiers = []; s.soldierTurn = 0; }
+  for (const sd of s.soldiers) if (sd.hp === undefined) { sd.hp = sd.maxHp = balance.soldiers.hp; }
   const need = ['tick', 'rng', 'commander', 'castle', 'pads', 'coins', 'buildings', 'walls', 'archers', 'enemies', 'spawn', 'camps', 'obstacles', 'paths'];
   if (need.some(k => s[k] === undefined)) return null;
   s.events = [];

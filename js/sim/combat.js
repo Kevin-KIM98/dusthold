@@ -1,7 +1,7 @@
 // 전투 (기획서 ③ 2026-11-10 개편)
 // - 성주: 빛나는 칼로 범위 베기(가까우면) / 손도끼 던지기(멀면). 적이 없으면 적 기지를 공격
 // - 궁수·망루: 가장 가까운 적, 없으면 사거리 안 적 기지
-// - 적: 메인 성채만 공격 (길을 막는 성벽은 부수고 지나감). 아군·다른 건물은 공격하지 않음
+// - 적: 메인 성채만 공격 (길을 막는 성벽은 부수고 지나감) + 돌격병. 성주·궁수·다른 건물은 공격하지 않음
 import { range } from './rng.js';
 import { spawnCoin } from './coins.js';
 import { enemyTarget, inReach, distToCastle } from './units.js';
@@ -159,15 +159,22 @@ export function updateCombat(state, balance) {
     if (e.cooldown > 0) continue;
     e.cooldown = ticks(t.attackInterval, balance);
     const dmg = Math.round(t.attack * (e.atk || 1));
-    hurtStructure(state, hit.kind, hit.obj, dmg, hit.px, hit.pz);
+    if (hit.kind === 'soldier') hurtSoldier(state, hit.obj, dmg);
+    else hurtStructure(state, hit.kind, hit.obj, dmg, hit.px, hit.pz);
     if (t.splash) {
-      // 거인: 내려친 자리 주변 splash m 안 다른 성벽 구간도 (건물은 성채만 공격하므로 성벽만)
+      // 거인: 내려친 자리 주변 splash m 안 다른 성벽 구간·돌격병도 (건물은 성채만 공격하므로 성벽만)
       for (const w of state.walls) if (w !== hit.obj && boxDist(w, hit.px, hit.pz).d <= t.splash) hurtStructure(state, 'wall', w, dmg, hit.px, hit.pz);
+      for (const sd of state.soldiers) if (sd !== hit.obj && Math.hypot(sd.x - hit.px, sd.z - hit.pz) <= t.splash) hurtSoldier(state, sd, dmg);
       state.events.push({ type: 'smash', x: hit.px, z: hit.pz });
     }
   }
 
   cleanupDead(state, balance);
+}
+
+function hurtSoldier(state, sd, dmg) {
+  sd.hp -= dmg;
+  state.events.push({ type: 'hit', target: 'soldier', id: sd.id, x: sd.x, z: sd.z, dmg });
 }
 
 function hurtStructure(state, kind, obj, dmg, x, z) {
@@ -228,6 +235,10 @@ function cleanupDead(state, balance) {
     state.enemies = alive;
   }
   for (const camp of state.camps) if (!camp.captured && camp.hp <= 0) captureCamp(state, camp, balance);
+  if (state.soldiers.some(sd => sd.hp <= 0)) {
+    for (const sd of state.soldiers) if (sd.hp <= 0) state.events.push({ type: 'soldierDown', id: sd.id, x: sd.x, z: sd.z });
+    state.soldiers = state.soldiers.filter(sd => sd.hp > 0); // 쓰러진 돌격병은 사라짐 (막사가 보충)
+  }
   if (state.walls.some(w => w.hp <= 0)) {
     for (const w of state.walls) if (w.hp <= 0) state.events.push({ type: 'wallDown', id: w.id, x: w.x, z: w.z, gate: w.gate });
     state.walls = state.walls.filter(w => w.hp > 0);

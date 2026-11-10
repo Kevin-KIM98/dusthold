@@ -99,6 +99,7 @@ function segmentHitsBox(ax, az, bx, bz, box, r) {
 /**
  * 이 적이 지금 공격하러 갈 대상 (기획서 ③ 2026-11-10: 아군 무시, 건물은 메인 성채만)
  * - 가려는 길을 2m 안 성벽이 막으면 그 성벽 (부서진 틈이 있으면 그리로 지나감)
+ * - 2m 안 돌격병이 있으면 그 돌격병 (아군 중 돌격병만 공격받음)
  * - 그 밖엔 길을 따라 성채로 (성채 공격은 combat에서 길 끝 도착 시)
  * - 반환: { kind: 'wall', obj, d(가장자리까지 거리), px, pz(다가갈 점) } 또는 null
  */
@@ -114,7 +115,16 @@ export function enemyTarget(state, e, balance) {
     if (!segmentHitsBox(e.x, e.z, gx, gz, w, er * 0.9)) continue;
     wall = { kind: 'wall', obj: w, d: b.d, px: b.px, pz: b.pz };
   }
-  return wall; // 망루·막사·세금 탁자는 공격하지 않음 (건물은 메인 성채만, 2026-11-10)
+  if (wall) return wall;
+  // 돌격병은 공격한다 (아군 중 유일, 2026-11-10). 망루·막사·세금 탁자는 공격하지 않음
+  let sol = null;
+  const sr = balance.soldiers.radius;
+  for (const sd of state.soldiers) {
+    if (Math.abs(sd.x - e.x) > aggro + sr || Math.abs(sd.z - e.z) > aggro + sr) continue;
+    const d = Math.hypot(sd.x - e.x, sd.z - e.z) - sr;
+    if (d <= aggro && (!sol || d < sol.d)) sol = { kind: 'soldier', obj: sd, d, px: sd.x, pz: sd.z };
+  }
+  return sol;
 }
 
 /** 대상이 손 닿는 거리인지 */

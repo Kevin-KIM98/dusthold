@@ -17,7 +17,7 @@ export function nextStage(state, balance) {
     if (wp && wp.rebuild) { wp.done = true; wp.rebuild = false; wp.paid = 0; }
   }
   state.camps = createCamps(state, balance);
-  resetSoldiers(state);
+  resetSoldiers(state, balance);
   const c = state.commander;
   if (!c.alive) {
     const s = balance.map.commanderStart;

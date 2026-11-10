@@ -498,6 +498,7 @@
     "aggroRange": 3.0,
     "speed": 3.2,
     "radius": 0.35,
-    "waypointReach": 0.8
+    "waypointReach": 0.8,
+    "hp": 120
   }
 }

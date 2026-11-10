@@ -1,5 +1,5 @@
 // 돌격병 (2026-11-10): 돌격대 막사에서 계속 나와 성문을 지나 길을 따라 적 기지로 행군한다.
-// 가는 길의 적과 싸우고, 기지에 닿으면 기지를 공격한다. 적은 아군을 공격하지 않으므로 쓰러지지 않는다.
+// 가는 길의 적과 싸우고, 기지에 닿으면 기지를 공격한다. 아군 중 돌격병만 적의 공격을 받는다(쓰러지면 막사가 보충).
 import { resolveCollisions } from './commander.js';
 import { boxDist } from './walls.js';
 
@@ -29,15 +29,19 @@ export function spawnSoldier(state, balance) {
   const open = state.camps.filter(c => !c.captured).map(c => c.pathId);
   const ids = open.length ? open : state.paths.map(p => p.id);
   const pathId = ids[state.soldierTurn++ % ids.length];
-  const sd = { id: state.nextId++, x: 0, z: 0, prevX: 0, prevZ: 0, angle: 0, prevAngle: 0, cooldown: 0, moving: false };
+  const hp = balance.soldiers.hp;
+  const sd = { id: state.nextId++, x: 0, z: 0, prevX: 0, prevZ: 0, angle: 0, prevAngle: 0, cooldown: 0, moving: false, hp, maxHp: hp };
   placeAtStart(state, sd, pathId);
   state.soldiers.push(sd);
   state.events.push({ type: 'soldierOut', id: sd.id, x: sd.x, z: sd.z });
 }
 
 /** 다음 스테이지: 모두 출발점으로 */
-export function resetSoldiers(state) {
-  state.soldiers.forEach((sd, i) => placeAtStart(state, sd, state.paths[i % state.paths.length].id));
+export function resetSoldiers(state, balance) {
+  state.soldiers.forEach((sd, i) => {
+    placeAtStart(state, sd, state.paths[i % state.paths.length].id);
+    sd.hp = sd.maxHp = balance.soldiers.hp; // 체력 회복
+  });
 }
 
 /** 이 돌격병이 싸울 적 (aggro m 안 가장 가까운 적) */
