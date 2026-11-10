@@ -1,13 +1,12 @@
 // 전투 (기획서 ③ 2026-11-10 개편)
 // - 성주: 빛나는 칼로 범위 베기(가까우면) / 손도끼 던지기(멀면). 적이 없으면 적 기지를 공격
 // - 궁수·망루: 가장 가까운 적, 없으면 사거리 안 적 기지
-// - 적: 건물만 공격 (성벽·망루·막사·세금 탁자·성채). 아군은 공격하지 않음
+// - 적: 메인 성채만 공격 (길을 막는 성벽은 부수고 지나감). 아군·다른 건물은 공격하지 않음
 import { range } from './rng.js';
 import { spawnCoin } from './coins.js';
 import { enemyTarget, inReach, distToCastle } from './units.js';
 import { boxDist } from './walls.js';
 import { captureCamp } from './camps.js';
-import { destroyBuilding } from './buildings.js';
 
 const ticks = (s, balance) => Math.round(s / balance.sim.tickSeconds);
 const enemyR = (e, balance) => balance.enemies.types[e.type].radius;
@@ -129,7 +128,7 @@ export function updateCombat(state, balance) {
     });
   }
 
-  // 적 공격: 건물만
+  // 적 공격: 길을 막는 성벽, 길 끝에선 성채
   for (const e of state.enemies) {
     if (e.hp <= 0) continue;
     const t = balance.enemies.types[e.type];
@@ -149,9 +148,8 @@ export function updateCombat(state, balance) {
     const dmg = Math.round(t.attack * (e.atk || 1));
     hurtStructure(state, hit.kind, hit.obj, dmg, hit.px, hit.pz);
     if (t.splash) {
-      // 거인: 내려친 자리 주변 splash m 안 다른 건물·성벽도
+      // 거인: 내려친 자리 주변 splash m 안 다른 성벽 구간도 (건물은 성채만 공격하므로 성벽만)
       for (const w of state.walls) if (w !== hit.obj && boxDist(w, hit.px, hit.pz).d <= t.splash) hurtStructure(state, 'wall', w, dmg, hit.px, hit.pz);
-      for (const b of state.buildings) if (b !== hit.obj && boxDist(b, hit.px, hit.pz).d <= t.splash) hurtStructure(state, 'building', b, dmg, hit.px, hit.pz);
       state.events.push({ type: 'smash', x: hit.px, z: hit.pz });
     }
   }
@@ -228,5 +226,4 @@ function cleanupDead(state, balance) {
       wp.cost = Math.ceil(def.cost * balance.buildings.rebuildCostFactor);
     }
   }
-  for (const b of [...state.buildings]) if (b.hp !== undefined && b.maxHp > 0 && b.hp <= 0) destroyBuilding(state, b, balance);
 }

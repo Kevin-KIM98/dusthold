@@ -86,7 +86,6 @@ export function createSound(cfg) {
           case 'pickup': case 'taxCollect': play('pickup'); break;
           case 'pay': play('pay'); break;
           case 'unlock': case 'towerUpgrade': play('unlock'); break;
-          case 'buildingDown': play('wall'); break;
           case 'hit': play(e.target === 'enemy' || e.target === 'wall' ? 'hit' : 'hurt'); break;
           case 'stageStart': case 'campCaptured': play('wave'); break; // 나팔: 스테이지 시작·적 기지 점령
           case 'slash': play('slash'); break;

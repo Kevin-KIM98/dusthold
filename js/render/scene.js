@@ -100,8 +100,6 @@ export function createScene(state, balance, canvas, art = { models: {}, textures
       } else if (e.type === 'campCaptured') {
         fx.puff(e.x, e.z, 3);
         fx.burst(e.x, e.z, 40);
-      } else if (e.type === 'buildingDown') {
-        fx.puff(e.x, e.z, 2.2);
       } else if (e.type === 'archerDown' || e.type === 'commanderDown') {
         fx.puff(e.x, e.z, 0.8);
       } else if (e.type === 'wallDown') {

@@ -26,6 +26,8 @@ const drawn = (cap) => page.evaluate(cap => {
 test('적 기지 표시가 뜨고, 시작 지연 뒤 적 기지에서 적이 나와 길을 따라 온다', { skip }, async () => {
   assert.equal(await page.$eval('.wave-n', el => el.textContent), '적 기지 점령 0/2');
   assert.match(await page.$eval('.wave-t', el => el.textContent), /적이 와요 \d+초/);
+  // 기다리는 시간 줄이기: 시작 지연을 건너뛰고 바로 나오게 (느린 테스트 환경 대비)
+  await page.evaluate(() => { const s = __game.state; s.spawn.startTick = s.tick - Math.round(__game.balance.camps.startDelaySeconds / __game.balance.sim.tickSeconds); s.camps.forEach(c => { c.nextTick = s.tick; }); });
   await page.waitForFunction(() => __game.state.enemies.length >= 3, null, { timeout: 60000 });
   assert.match(await page.$eval('.wave-t', el => el.textContent), /적 \d+명/);
   const enemiesDrawn = await page.evaluate(() => { let k = 0; __game.view.scene.traverse(o => { if (o.name === 'raider' || o.name === 'shield') k += o.count; }); return k; });

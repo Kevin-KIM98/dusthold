@@ -91,8 +91,8 @@ function giantParts() {
 const UNIT_SCALE = 1.25;
 
 // 머리 위 체력 바 높이(m, 키운 뒤 기준)
-const BAR_Y = { camp: 3.6, building: 3.2, tower: 7.0, wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
-const BAR_W = { camp: 3.2, building: 2.0, wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
+const BAR_Y = { camp: 3.6, wall: 3.0, archer: 1.95, raider: 1.95, shield: 2.15, giant: 4.4, commander: 2.9, castle: 7.6 };
+const BAR_W = { camp: 3.2, wall: 1.8, archer: 0.8, raider: 0.8, shield: 0.95, giant: 2.2, commander: 1.1, castle: 4.5 };
 
 export function createUnitView(scene, balance, art = { models: {} }) {
   const r = balance.render;
@@ -179,7 +179,6 @@ export function createUnitView(scene, balance, art = { models: {} }) {
       if (c.alive && c.hp < balance.commander.hp) bar(commanderPos.x, BAR_Y.commander, commanderPos.z, BAR_W.commander, c.hp / balance.commander.hp, GREEN);
       for (const w of state.walls) if (w.hp < w.maxHp) bar(w.x, BAR_Y.wall, w.z, Math.min(BAR_W.wall, 2 * Math.max(w.halfWidth, w.halfDepth)), w.hp / w.maxHp, GOLD);
       for (const cp of state.camps) if (!cp.captured && cp.hp < cp.maxHp) bar(cp.x, BAR_Y.camp, cp.z, BAR_W.camp, cp.hp / cp.maxHp, RED);
-      for (const b of state.buildings) if (b.maxHp > 0 && b.hp < b.maxHp) bar(b.x, b.kind === 'tower' ? BAR_Y.tower : BAR_Y.building, b.z, BAR_W.building, b.hp / b.maxHp, GOLD);
       const k = state.castle;
       if (k.hp < k.maxHp) bar(k.x, BAR_Y.castle, k.z, BAR_W.castle, k.hp / k.maxHp, GOLD);
       barBg.count = barFill.count = n;

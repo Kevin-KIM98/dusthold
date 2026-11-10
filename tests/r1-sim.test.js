@@ -66,33 +66,21 @@ test('적은 성주·궁수를 공격하지 않는다 (옆을 지나가도 체�
   assert.ok(!s.events.some(e => e.type === 'hit' && (e.target === 'commander' || e.target === 'archer')));
 });
 
-test('적은 2m 안 건물을 공격하고, 부서지면 그 자리에 패드가 절반 비용으로 다시 열린다 → 재건', () => {
+test('적은 막사·세금 탁자·망루를 공격하지 않고 지나가, 메인 성채만 공격한다', () => {
   const s = createState(B, 1);
   s.spawn.paused = true;
-  const bp = pad(s, 'barracks');
-  addBuilding(s, 'barracks', bp.x, bp.z, B); bp.done = true; s.unlocked.barracks = true;
-  run(s, 1);
-  assert.equal(pad(s, 'recruit').open, true);
-  const b = s.buildings[0];
-  for (let i = 0; i < 6; i++) { const e = spawnEnemy(s, 'shield', 'south', B); place(e, b.x + b.halfWidth + 0.9, b.z + i * 0.3 - 0.8); e.wp = 99; }
-  place(s.commander, 20, -20);
-  for (let i = 0; i < 120 * TPS && s.buildings.length; i++) {
-    step(s, STILL, B);
-    for (const e of s.enemies) if (Math.hypot(e.x - b.x, e.z - b.z) > 4) place(e, b.x + b.halfWidth + 0.9, b.z); // 붙잡아 두기
-  }
-  assert.equal(s.buildings.length, 0, '막사 부서짐');
-  assert.ok(s.events.some(e => e.type === 'buildingDown') || true);
-  assert.equal(bp.done, false);
-  assert.equal(bp.cost, Math.ceil(6 * B.buildings.rebuildCostFactor), '절반 비용');
-  run(s, 1);
-  assert.equal(pad(s, 'recruit').open, false, '막사가 없으면 모집 패드 닫힘');
-  s.enemies = [];
-  s.commander.coins = 10;
-  place(s.commander, bp.x, bp.z);
-  run(s, TPS);
-  assert.equal(s.buildings.filter(o => o.kind === 'barracks').length, 1, '재건');
-  assert.equal(bp.cost, 6, '원래 비용으로 돌아옴');
-  assert.equal(pad(s, 'recruit').open, true);
+  // 남쪽 길 끝(성채 앞) 바로 옆에 건물들을 둔다
+  const blds = [addBuilding(s, 'barracks', -3.2, 7.5, B), addBuilding(s, 'taxTable', 2.6, 8.5, B), addBuilding(s, 'tower', 3.0, 11.0, B)];
+  blds[2].towerArchers.forEach(t => { t.cooldown = 1e9; }); // 망루가 적을 잡지 않게
+  s.commander.cooldown = 1e9;
+  place(s.commander, -20, -20);
+  for (let i = 0; i < 8; i++) { const e = spawnEnemy(s, i % 3 ? 'raider' : 'shield', 'south', B); place(e, -0.6 + (i % 3) * 0.5, 14 + i * 0.8); e.wp = 3; }
+  const g = spawnEnemy(s, 'giant', 'south', B); place(g, 0, 16); g.wp = 3;
+  const hp0 = blds.map(b => b.hp);
+  run(s, 60 * TPS);
+  blds.forEach((b, i) => assert.equal(b.hp, hp0[i], `${b.kind}는 멀쩡`));
+  assert.ok(s.castle.hp < B.castle.hp, '성채는 공격당함');
+  assert.ok(!s.events.some(e => e.type === 'hit' && e.target === 'building'));
 });
 
 test('성벽 구간이 부서지면 성벽 패드가 절반 비용(15)으로 열리고, 내면 모든 구간을 지금 단계로 다시 세운다', () => {
